@@ -8,14 +8,8 @@
  */
 
 defined('_JEXEC') or die;
-
-if (!$list)
-{
-	return;
-}
-
 ?>
-<ul class="mostread mod-list">
+<ul class="mostread<?php echo $moduleclass_sfx; ?> mod-list">
 <?php foreach ($list as $item) : ?>
 	<li itemscope itemtype="https://schema.org/Article">
 		<a href="<?php echo $item->link; ?>" itemprop="url">

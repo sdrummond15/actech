@@ -8,20 +8,21 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Application\ApplicationHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Form\Form;
-use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\CMS\Language\Text;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('text');
 
 /**
  * Module Position field.
  *
  * @since  1.6
  */
-class ModulepositionField extends TextField
+class ModulepositionField extends \JFormFieldText
 {
 	/**
 	 * The form field type.
@@ -50,9 +51,10 @@ class ModulepositionField extends TextField
 	 */
 	public function __get($name)
 	{
-		if ($name === 'clientId')
+		switch ($name)
 		{
-			return $this->clientId;
+			case 'clientId':
+				return $this->clientId;
 		}
 
 		return parent::__get($name);
@@ -82,7 +84,7 @@ class ModulepositionField extends TextField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.
@@ -135,6 +137,9 @@ class ModulepositionField extends TextField
 	 */
 	protected function getInput()
 	{
+		// Load the modal behavior script.
+		\JHtml::_('behavior.modal', 'a.modal');
+
 		// Build the script.
 		$script = array();
 		$script[] = '	function jSelectPosition_' . $this->id . '(name) {';
@@ -153,24 +158,9 @@ class ModulepositionField extends TextField
 		// The current user display field.
 		$html[] = '<div class="input-append">';
 		$html[] = parent::getInput()
-			. '<a class="btn" title="' . Text::_('COM_MODULES_CHANGE_POSITION_TITLE') . '" href="' . $link
-			. '" data-bs-toggle="modal" data-bs-target="#modulePositionModal">'
-			. Text::_('COM_MODULES_CHANGE_POSITION_BUTTON') . '</a>';
-
-		$html[] = HTMLHelper::_(
-			'bootstrap.renderModal',
-			'modulePositionModal',
-			array(
-				'url'    => $link,
-				'title'  => Text::_('COM_MODULES_CHANGE_POSITION_BUTTON'),
-				'height' => '100%',
-				'width'  => '100%',
-				'modalWidth'  => '800',
-				'bodyHeight'  => '450',
-				'footer' => '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-hidden="true">'
-					. Text::_('JLIB_HTML_BEHAVIOR_CLOSE') . '</button>'
-			)
-		);
+			. '<a class="btn modal" title="' . \JText::_('COM_MODULES_CHANGE_POSITION_TITLE') . '"  href="' . $link
+			. '" rel="{handler: \'iframe\', size: {x: 800, y: 450}}">'
+			. \JText::_('COM_MODULES_CHANGE_POSITION_BUTTON') . '</a>';
 		$html[] = '</div>';
 
 		return implode("\n", $html);

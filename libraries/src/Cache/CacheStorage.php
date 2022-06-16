@@ -8,11 +8,10 @@
 
 namespace Joomla\CMS\Cache;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Cache\Exception\UnsupportedCacheException;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Path;
+use Joomla\CMS\Log\Log;
 
 /**
  * Abstract cache storage handler
@@ -87,14 +86,14 @@ class CacheStorage
 	 */
 	public function __construct($options = array())
 	{
-		$app = Factory::getApplication();
+		$config = \JFactory::getConfig();
 
-		$this->_hash        = md5($app->get('secret'));
-		$this->_application = $options['application'] ?? md5(JPATH_CONFIGURATION);
-		$this->_language    = $options['language'] ?? 'en-GB';
-		$this->_locking     = $options['locking'] ?? true;
-		$this->_lifetime    = ($options['lifetime'] ?? $app->get('cachetime')) * 60;
-		$this->_now         = $options['now'] ?? time();
+		$this->_hash        = md5($config->get('secret'));
+		$this->_application = (isset($options['application'])) ? $options['application'] : md5(JPATH_CONFIGURATION);
+		$this->_language    = (isset($options['language'])) ? $options['language'] : 'en-GB';
+		$this->_locking     = (isset($options['locking'])) ? $options['locking'] : true;
+		$this->_lifetime    = (isset($options['lifetime'])) ? $options['lifetime'] * 60 : $config->get('cachetime') * 60;
+		$this->_now         = (isset($options['now'])) ? $options['now'] : time();
 
 		// Set time threshold value.  If the lifetime is not set, default to 60 (0 is BAD)
 		// _threshold is now available ONLY as a legacy (it's deprecated).  It's no longer used in the core.
@@ -125,9 +124,12 @@ class CacheStorage
 	{
 		static $now = null;
 
+		// @deprecated  4.0  This class path is autoloaded, manual inclusion is no longer necessary
+		self::addIncludePath(__DIR__ . '/Storage');
+
 		if (!isset($handler))
 		{
-			$handler = Factory::getApplication()->get('cache_handler');
+			$handler = \JFactory::getConfig()->get('cache_handler');
 
 			if (empty($handler))
 			{
@@ -135,7 +137,7 @@ class CacheStorage
 			}
 		}
 
-		if (\is_null($now))
+		if (is_null($now))
 		{
 			$now = time();
 		}
@@ -156,7 +158,9 @@ class CacheStorage
 		if (!class_exists($class))
 		{
 			// Search for the class file in the JCacheStorage include paths.
-			$path = Path::find(self::addIncludePath(), strtolower($handler) . '.php');
+			\JLoader::import('joomla.filesystem.path');
+
+			$path = \JPath::find(self::addIncludePath(), strtolower($handler) . '.php');
 
 			if ($path === false)
 			{
@@ -310,6 +314,21 @@ class CacheStorage
 	}
 
 	/**
+	 * Test to see if the storage handler is available.
+	 *
+	 * @return  boolean
+	 *
+	 * @since   1.7.0
+	 * @deprecated  4.0
+	 */
+	public static function test()
+	{
+		Log::add(__METHOD__ . '() is deprecated. Use CacheStorage::isSupported() instead.', Log::WARNING, 'deprecated');
+
+		return static::isSupported();
+	}
+
+	/**
 	 * Lock cached item
 	 *
 	 * @param   string   $id        The cache data ID
@@ -376,9 +395,10 @@ class CacheStorage
 			$paths = array();
 		}
 
-		if (!empty($path) && !\in_array($path, $paths))
+		if (!empty($path) && !in_array($path, $paths))
 		{
-			array_unshift($paths, Path::clean($path));
+			\JLoader::import('joomla.filesystem.path');
+			array_unshift($paths, \JPath::clean($path));
 		}
 
 		return $paths;

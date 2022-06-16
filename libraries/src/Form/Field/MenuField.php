@@ -8,21 +8,22 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\Database\ParameterType;
+use Joomla\CMS\Form\FormHelper;
 
 // Import the com_menus helper.
 require_once realpath(JPATH_ADMINISTRATOR . '/components/com_menus/helpers/menus.php');
+
+FormHelper::loadFieldClass('GroupedList');
 
 /**
  * Supports an HTML select list of menus
  *
  * @since  1.6
  */
-class MenuField extends GroupedlistField
+class MenuField extends \JFormFieldGroupedList
 {
 	/**
 	 * The form field type.
@@ -44,31 +45,17 @@ class MenuField extends GroupedlistField
 	{
 		$clientId   = (string) $this->element['clientid'];
 		$accessType = (string) $this->element['accesstype'];
-		$showAll    = (string) $this->element['showAll'] === 'true';
+		$showAll    = (string) $this->element['showAll'] == 'true';
 
 		$db    = Factory::getDbo();
 		$query = $db->getQuery(true)
-			->select(
-				[
-					$db->quoteName('id'),
-					$db->quoteName('menutype', 'value'),
-					$db->quoteName('title', 'text'),
-					$db->quoteName('client_id'),
-				]
-			)
+			->select($db->qn(array('id', 'menutype', 'title', 'client_id'), array('id', 'value', 'text', 'client_id')))
 			->from($db->quoteName('#__menu_types'))
-			->order(
-				[
-					$db->quoteName('client_id'),
-					$db->quoteName('title'),
-				]
-			);
+			->order('client_id, title');
 
-		if (\strlen($clientId))
+		if (strlen($clientId))
 		{
-			$client = (int) $clientId;
-			$query->where($db->quoteName('client_id') . ' = :client')
-				->bind(':client', $client, ParameterType::INTEGER);
+			$query->where('client_id = ' . (int) $clientId);
 		}
 
 		$menus = $db->setQuery($query)->loadObjectList();
@@ -109,7 +96,7 @@ class MenuField extends GroupedlistField
 		{
 			$opts[] = (object) array(
 				'value'     => 'main',
-				'text'      => Text::_('COM_MENUS_MENU_TYPE_PROTECTED_MAIN_LABEL'),
+				'text'      => \JText::_('COM_MENUS_MENU_TYPE_PROTECTED_MAIN_LABEL'),
 				'client_id' => 1,
 			);
 		}
@@ -117,7 +104,7 @@ class MenuField extends GroupedlistField
 		$options = array_merge($opts, $menus);
 		$groups  = array();
 
-		if (\strlen($clientId))
+		if (strlen($clientId))
 		{
 			$groups[0] = $options;
 		}
@@ -126,7 +113,7 @@ class MenuField extends GroupedlistField
 			foreach ($options as $option)
 			{
 				// If client id is not specified we group the items.
-				$label = ($option->client_id == 1 ? Text::_('JADMINISTRATOR') : Text::_('JSITE'));
+				$label = ($option->client_id == 1 ? \JText::_('JADMINISTRATOR') : \JText::_('JSITE'));
 
 				$groups[$label][] = $option;
 			}

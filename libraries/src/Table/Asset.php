@@ -8,10 +8,7 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Table class supporting modified pre-order tree traversal behavior.
@@ -55,11 +52,11 @@ class Asset extends Nested
 	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  Database driver object.
+	 * @param   \JDatabaseDriver  $db  Database driver object.
 	 *
 	 * @since   1.7.0
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct($db)
 	{
 		parent::__construct('#__assets', 'id', $db);
 	}
@@ -87,17 +84,6 @@ class Asset extends Nested
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		$this->parent_id = (int) $this->parent_id;
 
 		if (empty($this->rules))
@@ -108,20 +94,18 @@ class Asset extends Nested
 		// Nested does not allow parent_id = 0, override this.
 		if ($this->parent_id > 0)
 		{
-			// Get the DatabaseQuery object
+			// Get the \JDatabaseQuery object
 			$query = $this->_db->getQuery(true)
 				->select('1')
 				->from($this->_db->quoteName($this->_tbl))
 				->where($this->_db->quoteName('id') . ' = ' . $this->parent_id);
 
-			$query->setLimit(1);
-
-			if ($this->_db->setQuery($query)->loadResult())
+			if ($this->_db->setQuery($query, 0, 1)->loadResult())
 			{
 				return true;
 			}
 
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_INVALID_PARENT_ID'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_INVALID_PARENT_ID'));
 
 			return false;
 		}
@@ -167,7 +151,7 @@ class Asset extends Nested
 				->where('parent_id = %d');
 
 			// If the table has an ordering field, use that for ordering.
-			if ($this->hasField('ordering'))
+			if (property_exists($this, 'ordering'))
 			{
 				$query->order('parent_id, ordering, lft');
 			}

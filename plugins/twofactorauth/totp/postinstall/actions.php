@@ -11,8 +11,6 @@
  * two-factor authentication code.
  */
 
-use Joomla\CMS\Factory;
-
 /**
  * Checks if the plugin is enabled. If not it returns true, meaning that the
  * message concerning two factor authentication should be displayed.
@@ -23,14 +21,14 @@ use Joomla\CMS\Factory;
  */
 function twofactorauth_postinstall_condition()
 {
-	$db = Factory::getContainer()->get(\Joomla\Database\DatabaseInterface::class);
+	$db = JFactory::getDbo();
 
 	$query = $db->getQuery(true)
 		->select('*')
-		->from($db->quoteName('#__extensions'))
-		->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
-		->where($db->quoteName('enabled') . ' = ' . 1)
-		->where($db->quoteName('folder') . ' = ' . $db->quote('twofactorauth'));
+		->from($db->qn('#__extensions'))
+		->where($db->qn('type') . ' = ' . $db->q('plugin'))
+		->where($db->qn('enabled') . ' = 1')
+		->where($db->qn('folder') . ' = ' . $db->q('twofactorauth'));
 	$db->setQuery($query);
 	$enabled_plugins = $db->loadObjectList();
 
@@ -49,20 +47,20 @@ function twofactorauth_postinstall_condition()
 function twofactorauth_postinstall_action()
 {
 	// Enable the plugin
-	$db = Factory::getContainer()->get(\Joomla\Database\DatabaseInterface::class);
+	$db = JFactory::getDbo();
 
 	$query = $db->getQuery(true)
-		->update($db->quoteName('#__extensions'))
-		->set($db->quoteName('enabled') . ' = ' . 1)
-		->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
-		->where($db->quoteName('folder') . ' = ' . $db->quote('twofactorauth'));
+		->update($db->qn('#__extensions'))
+		->set($db->qn('enabled') . ' = 1')
+		->where($db->qn('type') . ' = ' . $db->q('plugin'))
+		->where($db->qn('folder') . ' = ' . $db->q('twofactorauth'));
 	$db->setQuery($query);
 	$db->execute();
 
 	// Clean cache.
-	Factory::getCache()->clean('com_plugins');
+	JFactory::getCache()->clean('com_plugins');
 
 	// Redirect the user to their profile editor page
-	$url = 'index.php?option=com_users&task=user.edit&id=' . Factory::getUser()->id;
-	Factory::getApplication()->redirect($url);
+	$url = 'index.php?option=com_users&task=user.edit&id=' . JFactory::getUser()->id;
+	JFactory::getApplication()->redirect($url);
 }

@@ -8,18 +8,11 @@
 
 namespace Joomla\CMS\Menu;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Application\CMSApplication;
-use Joomla\CMS\Cache\CacheControllerFactoryInterface;
-use Joomla\CMS\Cache\Controller\CallbackController;
-use Joomla\CMS\Cache\Exception\CacheExceptionInterface;
-use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Language;
 use Joomla\CMS\Language\Multilanguage;
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
-use Joomla\Database\Exception\ExecutionFailureException;
 
 /**
  * Menu class
@@ -39,7 +32,7 @@ class SiteMenu extends AbstractMenu
 	/**
 	 * Database driver
 	 *
-	 * @var    DatabaseDriver
+	 * @var    \JDatabaseDriver
 	 * @since  3.5
 	 */
 	protected $db;
@@ -62,9 +55,9 @@ class SiteMenu extends AbstractMenu
 	public function __construct($options = array())
 	{
 		// Extract the internal dependencies before calling the parent constructor since it calls $this->load()
-		$this->app      = isset($options['app']) && $options['app'] instanceof CMSApplication ? $options['app'] : Factory::getApplication();
-		$this->db       = isset($options['db']) && $options['db'] instanceof DatabaseDriver ? $options['db'] : Factory::getDbo();
-		$this->language = isset($options['language']) && $options['language'] instanceof Language ? $options['language'] : Factory::getLanguage();
+		$this->app      = isset($options['app']) && $options['app'] instanceof CMSApplication ? $options['app'] : \JFactory::getApplication();
+		$this->db       = isset($options['db']) && $options['db'] instanceof \JDatabaseDriver ? $options['db'] : \JFactory::getDbo();
+		$this->language = isset($options['language']) && $options['language'] instanceof Language ? $options['language'] : \JFactory::getLanguage();
 
 		parent::__construct($options);
 	}
@@ -78,127 +71,63 @@ class SiteMenu extends AbstractMenu
 	 */
 	public function load()
 	{
-		$loader = function ()
+		// For PHP 5.3 compat we can't use $this in the lambda function below
+		$db = $this->db;
+
+		$loader = function () use ($db)
 		{
-			$currentDate = Factory::getDate()->toSql();
+			$query = $db->getQuery(true)
+				->select('m.id, m.menutype, m.title, m.alias, m.note, m.path AS route, m.link, m.type, m.level, m.language')
+				->select($db->quoteName('m.browserNav') . ', m.access, m.params, m.home, m.img, m.template_style_id, m.component_id, m.parent_id')
+				->select('e.element as component')
+				->from('#__menu AS m')
+				->join('LEFT', '#__extensions AS e ON m.component_id = e.extension_id')
+				->where('m.published = 1')
+				->where('m.parent_id > 0')
+				->where('m.client_id = 0')
+				->order('m.lft');
 
-			$query = $this->db->getQuery(true)
-				->select(
-					$this->db->quoteName(
-						[
-							'm.id',
-							'm.menutype',
-							'm.title',
-							'm.alias',
-							'm.note',
-							'm.link',
-							'm.type',
-							'm.level',
-							'm.language',
-							'm.browserNav',
-							'm.access',
-							'm.params',
-							'm.home',
-							'm.img',
-							'm.template_style_id',
-							'm.component_id',
-							'm.parent_id',
-						]
-					)
-				)
-				->select(
-					$this->db->quoteName(
-						[
-							'm.path',
-							'e.element',
-						],
-						[
-							'route',
-							'component',
-						]
-					)
-				)
-				->from($this->db->quoteName('#__menu', 'm'))
-				->join(
-					'LEFT',
-					$this->db->quoteName('#__extensions', 'e'),
-					$this->db->quoteName('m.component_id') . ' = ' . $this->db->quoteName('e.extension_id')
-				)
-				->where(
-					[
-						$this->db->quoteName('m.published') . ' = 1',
-						$this->db->quoteName('m.parent_id') . ' > 0',
-						$this->db->quoteName('m.client_id') . ' = 0',
-					]
-				)
-				->extendWhere(
-					'AND',
-					[
-						$this->db->quoteName('m.publish_up') . ' IS NULL',
-						$this->db->quoteName('m.publish_up') . ' <= :currentDate1',
-					],
-					'OR'
-				)
-				->bind(':currentDate1', $currentDate)
-				->extendWhere(
-					'AND',
-					[
-						$this->db->quoteName('m.publish_down') . ' IS NULL',
-						$this->db->quoteName('m.publish_down') . ' >= :currentDate2',
-					],
-					'OR'
-				)
-				->bind(':currentDate2', $currentDate)
-				->order($this->db->quoteName('m.lft'));
+			// Set the query
+			$db->setQuery($query);
 
-			$items    = [];
-			$iterator = $this->db->setQuery($query)->getIterator();
-
-			foreach ($iterator as $item)
-			{
-				$items[$item->id] = new MenuItem((array) $item);
-			}
-
-			return $items;
+			return $db->loadObjectList('id', 'Joomla\\CMS\\Menu\\MenuItem');
 		};
 
 		try
 		{
-			/** @var CallbackController $cache */
-			$cache = Factory::getContainer()->get(CacheControllerFactoryInterface::class)
-				->createCacheController('callback', ['defaultgroup' => 'com_menus']);
+			/** @var \JCacheControllerCallback $cache */
+			$cache = \JFactory::getCache('com_menus', 'callback');
 
-			$this->items = $cache->get($loader, array(), md5(\get_class($this)), false);
+			$this->_items = $cache->get($loader, array(), md5(get_class($this)), false);
 		}
-		catch (CacheExceptionInterface $e)
+		catch (\JCacheException $e)
 		{
 			try
 			{
-				$this->items = $loader();
+				$this->_items = $loader();
 			}
-			catch (ExecutionFailureException $databaseException)
+			catch (\JDatabaseExceptionExecuting $databaseException)
 			{
-				$this->app->enqueueMessage(Text::sprintf('JERROR_LOADING_MENUS', $databaseException->getMessage()), 'warning');
+				\JError::raiseWarning(500, \JText::sprintf('JERROR_LOADING_MENUS', $databaseException->getMessage()));
 
 				return false;
 			}
 		}
-		catch (ExecutionFailureException $e)
+		catch (\JDatabaseExceptionExecuting $e)
 		{
-			$this->app->enqueueMessage(Text::sprintf('JERROR_LOADING_MENUS', $e->getMessage()), 'warning');
+			\JError::raiseWarning(500, \JText::sprintf('JERROR_LOADING_MENUS', $e->getMessage()));
 
 			return false;
 		}
 
-		foreach ($this->items as &$item)
+		foreach ($this->_items as &$item)
 		{
 			// Get parent information.
 			$parent_tree = array();
 
-			if (isset($this->items[$item->parent_id]))
+			if (isset($this->_items[$item->parent_id]))
 			{
-				$item->setParent($this->items[$item->parent_id]);
-				$parent_tree  = $this->items[$item->parent_id]->tree;
+				$parent_tree = $this->_items[$item->parent_id]->tree;
 			}
 
 			// Create tree.
@@ -239,7 +168,7 @@ class SiteMenu extends AbstractMenu
 				if (Multilanguage::isEnabled())
 				{
 					$attributes[] = 'language';
-					$values[]     = array(Factory::getLanguage()->getTag(), '*');
+					$values[]     = array(\JFactory::getLanguage()->getTag(), '*');
 				}
 			}
 			elseif ($values[$key] === null)
@@ -277,17 +206,16 @@ class SiteMenu extends AbstractMenu
 	 */
 	public function getDefault($language = '*')
 	{
-		// Get menu items first to ensure defaults have been populated
-		$items = $this->getMenu();
-
-		if (\array_key_exists($language, $this->default) && $this->app->isClient('site') && $this->app->getLanguageFilter())
+		if (array_key_exists($language, $this->_default) && $this->app->isClient('site') && $this->app->getLanguageFilter())
 		{
-			return $items[$this->default[$language]];
+			return $this->_items[$this->_default[$language]];
 		}
 
-		if (\array_key_exists('*', $this->default))
+		if (array_key_exists('*', $this->_default))
 		{
-			return $items[$this->default['*']];
+			return $this->_items[$this->_default['*']];
 		}
+
+		return;
 	}
 }

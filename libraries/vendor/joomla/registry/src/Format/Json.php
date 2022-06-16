@@ -2,21 +2,20 @@
 /**
  * Part of the Joomla Framework Registry Package
  *
- * @copyright  Copyright (C) 2005 - 2021 Open Source Matters, Inc. All rights reserved.
+ * @copyright  Copyright (C) 2005 - 2022 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
 
 namespace Joomla\Registry\Format;
 
-use Joomla\Registry\Factory;
-use Joomla\Registry\FormatInterface;
+use Joomla\Registry\AbstractRegistryFormat;
 
 /**
  * JSON format handler for Registry.
  *
  * @since  1.0
  */
-class Json implements FormatInterface
+class Json extends AbstractRegistryFormat
 {
 	/**
 	 * Converts an object into a JSON formatted string.
@@ -28,12 +27,19 @@ class Json implements FormatInterface
 	 *
 	 * @since   1.0
 	 */
-	public function objectToString($object, array $options = [])
+	public function objectToString($object, $options = array())
 	{
-		$bitMask = $options['bitmask'] ?? 0;
-		$depth   = $options['depth'] ?? 512;
+		$bitMask = isset($options['bitmask']) ? $options['bitmask'] : 0;
 
-		return json_encode($object, $bitMask, $depth);
+		// The depth parameter is only present as of PHP 5.5
+		if (version_compare(PHP_VERSION, '5.5', '>='))
+		{
+			$depth = isset($options['depth']) ? $options['depth'] : 512;
+
+			return json_encode($object, $bitMask, $depth);
+		}
+
+		return json_encode($object, $bitMask);
 	}
 
 	/**
@@ -49,7 +55,7 @@ class Json implements FormatInterface
 	 * @since   1.0
 	 * @throws  \RuntimeException
 	 */
-	public function stringToObject($data, array $options = ['processSections' => false])
+	public function stringToObject($data, array $options = array('processSections' => false))
 	{
 		$data = trim($data);
 
@@ -59,17 +65,16 @@ class Json implements FormatInterface
 			return new \stdClass;
 		}
 
+		if ($data !== '' && $data[0] !== '{')
+		{
+			return AbstractRegistryFormat::getInstance('Ini')->stringToObject($data, $options);
+		}
+
 		$decoded = json_decode($data);
 
 		// Check for an error decoding the data
 		if ($decoded === null && json_last_error() !== JSON_ERROR_NONE)
 		{
-			// If it's an ini file, parse as ini.
-			if ($data !== '' && $data[0] !== '{')
-			{
-				return Factory::getFormat('Ini')->stringToObject($data, $options);
-			}
-
 			throw new \RuntimeException(sprintf('Error decoding JSON data: %s', json_last_error_msg()));
 		}
 

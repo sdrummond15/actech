@@ -9,12 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Multilanguage;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Router\Route;
-use Joomla\Component\Contact\Site\Helper\RouteHelper;
-use Joomla\Database\ParameterType;
 use Joomla\Registry\Registry;
 
 /**
@@ -22,11 +16,12 @@ use Joomla\Registry\Registry;
  *
  * @since  3.2
  */
-class PlgContentContact extends CMSPlugin
+class PlgContentContact extends JPlugin
 {
 	/**
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * Database object
 	 *
+	 * @var    JDatabaseDriver
 	 * @since  3.3
 	 */
 	protected $db;
@@ -39,7 +34,7 @@ class PlgContentContact extends CMSPlugin
 	 * @param   mixed    $params   Additional parameters. See {@see PlgContentContent()}.
 	 * @param   integer  $page     Optional page number. Unused. Defaults to zero.
 	 *
-	 * @return  void
+	 * @return  boolean	True on success.
 	 */
 	public function onContentPrepare($context, &$row, $params, $page = 0)
 	{
@@ -47,34 +42,28 @@ class PlgContentContact extends CMSPlugin
 
 		if (!in_array($context, $allowed_contexts))
 		{
-			return;
+			return true;
 		}
 
 		// Return if we don't have valid params or don't link the author
 		if (!($params instanceof Registry) || !$params->get('link_author'))
 		{
-			return;
+			return true;
 		}
 
 		// Return if an alias is used
 		if ((int) $this->params->get('link_to_alias', 0) === 0 && $row->created_by_alias != '')
 		{
-			return;
+			return true;
 		}
 
 		// Return if we don't have a valid article id
 		if (!isset($row->id) || !(int) $row->id)
 		{
-			return;
+			return true;
 		}
 
-		$contact = $this->getContactData($row->created_by);
-
-		if ($contact === null)
-		{
-			return;
-		}
-
+		$contact        = $this->getContactData($row->created_by);
 		$row->contactid = $contact->contactid;
 		$row->webpage   = $contact->webpage;
 		$row->email     = $contact->email_to;
@@ -82,7 +71,8 @@ class PlgContentContact extends CMSPlugin
 
 		if ($row->contactid && $url === 'url')
 		{
-			$row->contact_link = Route::_(RouteHelper::getContactRoute($contact->contactid . ':' . $contact->alias, $contact->catid));
+			JLoader::register('ContactHelperRoute', JPATH_SITE . '/components/com_contact/helpers/route.php');
+			$row->contact_link = JRoute::_(ContactHelperRoute::getContactRoute($contact->contactid . ':' . $contact->alias, $contact->catid));
 		}
 		elseif ($row->webpage && $url === 'webpage')
 		{
@@ -96,6 +86,8 @@ class PlgContentContact extends CMSPlugin
 		{
 			$row->contact_link = '';
 		}
+
+		return true;
 	}
 
 	/**
@@ -103,57 +95,34 @@ class PlgContentContact extends CMSPlugin
 	 *
 	 * @param   int  $userId  Id of the user who created the article
 	 *
-	 * @return  stdClass|null  Object containing contact details or null if not found
+	 * @return  mixed|null|integer
 	 */
 	protected function getContactData($userId)
 	{
 		static $contacts = array();
 
-		// Note: don't use isset() because value could be null.
-		if (array_key_exists($userId, $contacts))
+		if (isset($contacts[$userId]))
 		{
 			return $contacts[$userId];
 		}
 
-		$db     = $this->db;
-		$query  = $db->getQuery(true);
-		$userId = (int) $userId;
+		$query = $this->db->getQuery(true);
 
-		$query->select($db->quoteName('contact.id', 'contactid'))
-			->select(
-				$db->quoteName(
-					[
-						'contact.alias',
-						'contact.catid',
-						'contact.webpage',
-						'contact.email_to',
-					]
-				)
-			)
-			->from($db->quoteName('#__contact_details', 'contact'))
-			->where(
-				[
-					$db->quoteName('contact.published') . ' = 1',
-					$db->quoteName('contact.user_id') . ' = :createdby',
-				]
-			)
-			->bind(':createdby', $userId, ParameterType::INTEGER);
+		$query->select('MAX(contact.id) AS contactid, contact.alias, contact.catid, contact.webpage, contact.email_to');
+		$query->from($this->db->quoteName('#__contact_details', 'contact'));
+		$query->where('contact.published = 1');
+		$query->where('contact.user_id = ' . (int) $userId);
 
-		if (Multilanguage::isEnabled() === true)
+		if (JLanguageMultilang::isEnabled() === true)
 		{
-			$query->where(
-				'(' . $db->quoteName('contact.language') . ' IN ('
-				. implode(',', $query->bindArray([Factory::getLanguage()->getTag(), '*'], ParameterType::STRING))
-				. ') OR ' . $db->quoteName('contact.language') . ' IS NULL)'
-			);
+			$query->where('(contact.language in '
+				. '(' . $this->db->quote(JFactory::getLanguage()->getTag()) . ',' . $this->db->quote('*') . ') '
+				. ' OR contact.language IS NULL)');
 		}
 
-		$query->order($db->quoteName('contact.id') . ' DESC')
-			->setLimit(1);
+		$this->db->setQuery($query);
 
-		$db->setQuery($query);
-
-		$contacts[$userId] = $db->loadObject();
+		$contacts[$userId] = $this->db->loadObject();
 
 		return $contacts[$userId];
 	}

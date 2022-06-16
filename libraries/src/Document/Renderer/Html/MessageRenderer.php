@@ -8,10 +8,10 @@
 
 namespace Joomla\CMS\Document\Renderer\Html;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Document\DocumentRenderer;
-use Joomla\CMS\Factory;
+use Joomla\CMS\Log\Log;
 use Joomla\CMS\Layout\LayoutHelper;
 
 /**
@@ -42,20 +42,17 @@ class MessageRenderer extends DocumentRenderer
 			'content' => $content,
 		);
 
-		$app        = Factory::getApplication();
+		$app        = \JFactory::getApplication();
 		$chromePath = JPATH_THEMES . '/' . $app->getTemplate() . '/html/message.php';
 
-		if (is_file($chromePath))
+		if (file_exists($chromePath))
 		{
 			include_once $chromePath;
 		}
 
-		if (\function_exists('renderMessage'))
+		if (function_exists('renderMessage'))
 		{
-			@trigger_error(
-				'renderMessage() is deprecated. Override system message rendering with layouts instead.',
-				E_USER_DEPRECATED
-			);
+			Log::add('renderMessage() is deprecated. Override system message rendering with layouts instead.', Log::WARNING, 'deprecated');
 
 			return renderMessage($msgList);
 		}
@@ -76,10 +73,10 @@ class MessageRenderer extends DocumentRenderer
 		$lists = array();
 
 		// Get the message queue
-		$messages = Factory::getApplication()->getMessageQueue();
+		$messages = \JFactory::getApplication()->getMessageQueue();
 
 		// Build the sorted message list
-		if (\is_array($messages) && !empty($messages))
+		if (is_array($messages) && !empty($messages))
 		{
 			foreach ($messages as $msg)
 			{

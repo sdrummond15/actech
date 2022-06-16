@@ -32,7 +32,7 @@ class PlgSystemSessionGc extends CMSPlugin
 	/**
 	 * Database driver
 	 *
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * @var    JDatabaseDriver
 	 * @since  3.8.6
 	 */
 	protected $db;
@@ -46,6 +46,8 @@ class PlgSystemSessionGc extends CMSPlugin
 	 */
 	public function onAfterRespond()
 	{
+		$session = Factory::getSession();
+
 		if ($this->params->get('enable_session_gc', 1))
 		{
 			$probability = $this->params->get('gc_probability', 1);
@@ -55,7 +57,7 @@ class PlgSystemSessionGc extends CMSPlugin
 
 			if ($probability > 0 && $random < $probability)
 			{
-				$this->app->getSession()->gc();
+				$session->gc();
 			}
 		}
 
@@ -68,9 +70,8 @@ class PlgSystemSessionGc extends CMSPlugin
 
 			if ($probability > 0 && $random < $probability)
 			{
-				/** @var MetadataManager $metadataManager */
-				$metadataManager = Factory::getContainer()->get(MetadataManager::class);
-				$metadataManager->deletePriorTo(time() - $this->app->getSession()->getExpire());
+				$metadataManager = new MetadataManager($this->app, $this->db);
+				$metadataManager->deletePriorTo(time() - $session->getExpire());
 			}
 		}
 	}

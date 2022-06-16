@@ -9,12 +9,7 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Language\Text;
-
-/** @var Joomla\CMS\WebAsset\WebAssetManager $wa */
-$wa = $app->getDocument()->getWebAssetManager();
-$wa->registerAndUseScript('com_wrapper.iframe', 'com_wrapper/iframe-height.min.js', [], ['defer' => true]);
-
+JHtml::_('script', 'com_wrapper/iframe-height.min.js', array('version' => 'auto', 'relative' => true));
 ?>
 <iframe <?php echo $load; ?>
 	id="blockrandom-<?php echo $id; ?>"
@@ -22,8 +17,9 @@ $wa->registerAndUseScript('com_wrapper.iframe', 'com_wrapper/iframe-height.min.j
 	src="<?php echo $url; ?>"
 	width="<?php echo $width; ?>"
 	height="<?php echo $height; ?>"
-	loading="<?php echo $lazyloading; ?>"
+	scrolling="<?php echo $scroll; ?>"
+	frameborder="<?php echo $frameborder; ?>"
 	title="<?php echo $ititle; ?>"
-	class="mod-wrapper wrapper">
-	<?php echo Text::_('MOD_WRAPPER_NO_IFRAMES'); ?>
+	class="wrapper<?php echo $moduleclass_sfx; ?>" >
+	<?php echo JText::_('MOD_WRAPPER_NO_IFRAMES'); ?>
 </iframe>

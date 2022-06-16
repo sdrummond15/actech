@@ -8,10 +8,7 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Languages table.
@@ -23,11 +20,11 @@ class Language extends Table
 	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  Database driver object.
+	 * @param   \JDatabaseDriver  $db  Database driver object.
 	 *
 	 * @since   1.7.0
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct($db)
 	{
 		parent::__construct('#__languages', 'lang_id', $db);
 	}
@@ -41,20 +38,9 @@ class Language extends Table
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		if (trim($this->title) == '')
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_LANGUAGE_NO_TITLE'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_LANGUAGE_NO_TITLE'));
 
 			return false;
 		}
@@ -78,7 +64,7 @@ class Language extends Table
 		// Verify that the language code is unique
 		if ($table->load(array('lang_code' => $this->lang_code)) && ($table->lang_id != $this->lang_id || $this->lang_id == 0))
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_LANG_CODE'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_LANG_CODE'));
 
 			return false;
 		}
@@ -86,7 +72,7 @@ class Language extends Table
 		// Verify that the sef field is unique
 		if ($table->load(array('sef' => $this->sef)) && ($table->lang_id != $this->lang_id || $this->lang_id == 0))
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_IMAGE'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_IMAGE'));
 
 			return false;
 		}
@@ -94,7 +80,7 @@ class Language extends Table
 		// Verify that the image field is unique
 		if ($this->image && $table->load(array('image' => $this->image)) && ($table->lang_id != $this->lang_id || $this->lang_id == 0))
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_IMAGE'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_LANGUAGE_UNIQUE_IMAGE'));
 
 			return false;
 		}
@@ -152,6 +138,6 @@ class Language extends Table
 			$assetId = $asset->id;
 		}
 
-		return $assetId ?? parent::_getAssetParentId($table, $id);
+		return $assetId === null ? parent::_getAssetParentId($table, $id) : $assetId;
 	}
 }

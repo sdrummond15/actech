@@ -8,12 +8,10 @@
 
 namespace Joomla\CMS\Document;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Document\Opensearch\OpensearchImage;
 use Joomla\CMS\Document\Opensearch\OpensearchUrl;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Router\Route;
 use Joomla\CMS\Uri\Uri;
 
 /**
@@ -73,17 +71,17 @@ class OpensearchDocument extends Document
 		$update = new OpensearchUrl;
 		$update->type = 'application/opensearchdescription+xml';
 		$update->rel = 'self';
-		$update->template = Route::_(Uri::getInstance());
+		$update->template = \JRoute::_(Uri::getInstance());
 		$this->addUrl($update);
 
 		// Add the favicon as the default image
 		// Try to find a favicon by checking the template and root folder
-		$app = Factory::getApplication();
+		$app = \JFactory::getApplication();
 		$dirs = array(JPATH_THEMES . '/' . $app->getTemplate(), JPATH_BASE);
 
 		foreach ($dirs as $dir)
 		{
-			if (is_file($dir . '/favicon.ico'))
+			if (file_exists($dir . '/favicon.ico'))
 			{
 				$path = str_replace(JPATH_BASE, '', $dir);
 				$path = str_replace('\\', '/', $path);
@@ -128,7 +126,7 @@ class OpensearchDocument extends Document
 	{
 		$xml = new \DOMDocument('1.0', 'utf-8');
 
-		if (\defined('JDEBUG') && JDEBUG)
+		if (defined('JDEBUG') && JDEBUG)
 		{
 			$xml->formatOutput = true;
 		}
@@ -137,24 +135,24 @@ class OpensearchDocument extends Document
 		$osns = 'http://a9.com/-/spec/opensearch/1.1/';
 
 		// Create the root element
-		$elOs = $xml->createElementNS($osns, 'OpenSearchDescription');
+		$elOs = $xml->createElementNs($osns, 'OpenSearchDescription');
 
-		$elShortName = $xml->createElementNS($osns, 'ShortName');
+		$elShortName = $xml->createElementNs($osns, 'ShortName');
 		$elShortName->appendChild($xml->createTextNode(htmlspecialchars($this->_shortName)));
 		$elOs->appendChild($elShortName);
 
-		$elDescription = $xml->createElementNS($osns, 'Description');
+		$elDescription = $xml->createElementNs($osns, 'Description');
 		$elDescription->appendChild($xml->createTextNode(htmlspecialchars($this->description)));
 		$elOs->appendChild($elDescription);
 
 		// Always set the accepted input encoding to UTF-8
-		$elInputEncoding = $xml->createElementNS($osns, 'InputEncoding');
+		$elInputEncoding = $xml->createElementNs($osns, 'InputEncoding');
 		$elInputEncoding->appendChild($xml->createTextNode('UTF-8'));
 		$elOs->appendChild($elInputEncoding);
 
 		foreach ($this->_images as $image)
 		{
-			$elImage = $xml->createElementNS($osns, 'Image');
+			$elImage = $xml->createElementNs($osns, 'Image');
 			$elImage->setAttribute('type', $image->type);
 			$elImage->setAttribute('width', $image->width);
 			$elImage->setAttribute('height', $image->height);
@@ -164,11 +162,11 @@ class OpensearchDocument extends Document
 
 		foreach ($this->_urls as $url)
 		{
-			$elUrl = $xml->createElementNS($osns, 'Url');
+			$elUrl = $xml->createElementNs($osns, 'Url');
 			$elUrl->setAttribute('type', $url->type);
 
 			// Results is the default value so we don't need to add it
-			if ($url->rel !== 'results')
+			if ($url->rel != 'results')
 			{
 				$elUrl->setAttribute('rel', $url->rel);
 			}
@@ -180,7 +178,7 @@ class OpensearchDocument extends Document
 		$xml->appendChild($elOs);
 		parent::render($cache, $params);
 
-		return $xml->saveXML();
+		return $xml->saveXml();
 	}
 
 	/**

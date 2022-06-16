@@ -8,16 +8,18 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\HTML\HTMLHelper;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('list');
 
 /**
  * Module Tag field.
  *
  * @since  3.0
  */
-class ModuletagField extends ListField
+class ModuletagField extends \JFormFieldList
 {
 	/**
 	 * The form field type.
@@ -42,7 +44,7 @@ class ModuletagField extends ListField
 		// Create one new option object for each tag
 		foreach ($tags as $tag)
 		{
-			$tmp = HTMLHelper::_('select.option', $tag, $tag);
+			$tmp = \JHtml::_('select.option', $tag, $tag);
 			$options[] = $tmp;
 		}
 

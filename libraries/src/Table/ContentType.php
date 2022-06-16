@@ -8,10 +8,7 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Tags table
@@ -23,11 +20,11 @@ class ContentType extends Table
 	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  A database connector object
+	 * @param   \JDatabaseDriver  $db  A database connector object
 	 *
 	 * @since   3.1
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct($db)
 	{
 		parent::__construct('#__content_types', 'type_id', $db);
 	}
@@ -42,17 +39,6 @@ class ContentType extends Table
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		// Check for valid name.
 		if (trim($this->type_title) === '')
 		{
@@ -85,7 +71,7 @@ class ContentType extends Table
 
 		if ($table->load(array('type_alias' => $this->type_alias)) && ($table->type_id != $this->type_id || $this->type_id == 0))
 		{
-			$this->setError(Text::_('COM_TAGS_ERROR_UNIQUE_ALIAS'));
+			$this->setError(\JText::_('COM_TAGS_ERROR_UNIQUE_ALIAS'));
 
 			return false;
 		}
@@ -122,8 +108,7 @@ class ContentType extends Table
 		$query = $db->getQuery(true);
 		$query->select($db->quoteName('type_id'))
 			->from($db->quoteName($this->_tbl))
-			->where($db->quoteName('type_alias') . ' = :type_alias')
-			->bind(':type_alias', $typeAlias);
+			->where($db->quoteName('type_alias') . ' = ' . $db->quote($typeAlias));
 		$db->setQuery($query);
 
 		return $db->loadResult();
@@ -143,11 +128,11 @@ class ContentType extends Table
 		$result = false;
 		$tableInfo = json_decode($this->table);
 
-		if (\is_object($tableInfo) && isset($tableInfo->special))
+		if (is_object($tableInfo) && isset($tableInfo->special))
 		{
-			if (\is_object($tableInfo->special) && isset($tableInfo->special->type) && isset($tableInfo->special->prefix))
+			if (is_object($tableInfo->special) && isset($tableInfo->special->type) && isset($tableInfo->special->prefix))
 			{
-				$class = $tableInfo->special->class ?? 'Joomla\\CMS\\Table\\Table';
+				$class = isset($tableInfo->special->class) ? $tableInfo->special->class : 'Joomla\\CMS\\Table\\Table';
 
 				if (!class_implements($class, 'Joomla\\CMS\\Table\\TableInterface'))
 				{

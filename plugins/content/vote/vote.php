@@ -9,19 +9,17 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Plugin\PluginHelper;
-
 /**
  * Vote plugin.
  *
  * @since  1.5
  */
-class PlgContentVote extends CMSPlugin
+class PlgContentVote extends JPlugin
 {
 	/**
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * Application object
 	 *
+	 * @var    JApplicationCms
 	 * @since  3.7.0
 	 */
 	protected $app;
@@ -30,12 +28,13 @@ class PlgContentVote extends CMSPlugin
 	 * The position the voting data is displayed in relative to the article.
 	 *
 	 * @var    string
-	 *
 	 * @since  3.7.0
 	 */
 	protected $votingPosition;
 
 	/**
+	 * Constructor.
+	 *
 	 * @param   object  &$subject  The object to observe
 	 * @param   array   $config    An optional associative array of configuration settings.
 	 *
@@ -122,7 +121,7 @@ class PlgContentVote extends CMSPlugin
 		$this->loadLanguage();
 
 		// Get the path for the rating summary layout file
-		$path = PluginHelper::getLayoutPath('content', 'vote', 'rating');
+		$path = JPluginHelper::getLayoutPath('content', 'vote', 'rating');
 
 		// Render the layout
 		ob_start();
@@ -132,7 +131,7 @@ class PlgContentVote extends CMSPlugin
 		if ($this->app->input->getString('view', '') === 'article' && $row->state == 1)
 		{
 			// Get the path for the voting form layout file
-			$path = PluginHelper::getLayoutPath('content', 'vote', 'vote');
+			$path = JPluginHelper::getLayoutPath('content', 'vote', 'vote');
 
 			// Render the layout
 			ob_start();

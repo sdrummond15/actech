@@ -40,9 +40,11 @@ extract($displayData);
  * @var   array    $checkedOptions  Options that will be set as checked.
  * @var   boolean  $hasValue        Has this field a value assigned?
  * @var   array    $options         Options available for this field.
- * @var   string   $dataAttribute   Miscellaneous data attributes preprocessed for HTML output
- * @var   array    $dataAttributes  Miscellaneous data attributes for eg, data-*.
  */
+
+// Including fallback code for HTML5 non supported browsers.
+JHtml::_('jquery.framework');
+JHtml::_('script', 'system/html5fallback.js', array('version' => 'auto', 'relative' => true, 'conditional' => 'lt IE 9'));
 
 /**
  * The format of the input tag to be filled in using sprintf.
@@ -51,17 +53,15 @@ extract($displayData);
  *     %3 - value
  *     %4 = any other attributes
  */
-$format = '<input type="checkbox" id="%1$s" name="%2$s" value="%3$s" %4$s>';
+$format = '<input type="checkbox" id="%1$s" name="%2$s" value="%3$s" %4$s />';
 
-// The alt option for Text::alt
+// The alt option for JText::alt
 $alt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $name);
 ?>
 
 <fieldset id="<?php echo $id; ?>" class="<?php echo trim($class . ' checkboxes'); ?>"
-	<?php echo $required ? 'required' : ''; ?>
-	<?php echo $autofocus ? 'autofocus' : ''; ?>
-	<?php echo $dataAttribute; ?>>
-	<legend class="visually-hidden"><?php echo $label; ?></legend>
+	<?php echo $required ? 'required aria-required="true"' : ''; ?>
+	<?php echo $autofocus ? 'autofocus' : ''; ?>>
 
 	<?php foreach ($options as $i => $option) : ?>
 		<?php
@@ -70,7 +70,7 @@ $alt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $name);
 
 			// In case there is no stored value, use the option's default state.
 			$checked        = (!$hasValue && $option->checked) ? 'checked' : $checked;
-			$optionClass    = !empty($option->class) ? 'class="form-check-input ' . $option->class . '"' : ' class="form-check-input"';
+			$optionClass    = !empty($option->class) ? 'class="' . $option->class . '"' : '';
 			$optionDisabled = !empty($option->disable) || $disabled ? 'disabled' : '';
 
 			// Initialize some JavaScript option attributes.
@@ -81,11 +81,9 @@ $alt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $name);
 			$value      = htmlspecialchars($option->value, ENT_COMPAT, 'UTF-8');
 			$attributes = array_filter(array($checked, $optionClass, $optionDisabled, $onchange, $onclick));
 		?>
-		<div class="form-check form-check-inline">
-		<?php echo sprintf($format, $oid, $name, $value, implode(' ', $attributes)); ?>
-			<label for="<?php echo $oid; ?>" class="form-check-label">
-				<?php echo $option->text; ?>
-			</label>
-		</div>
+
+		<label for="<?php echo $oid; ?>" class="checkbox">
+			<?php echo sprintf($format, $oid, $name, $value, implode(' ', $attributes)); ?>
+		<?php echo $option->text; ?></label>
 	<?php endforeach; ?>
 </fieldset>

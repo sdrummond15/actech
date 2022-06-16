@@ -8,11 +8,10 @@
 
 namespace Joomla\CMS\Categories;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Multilanguage;
-use Joomla\Database\ParameterType;
 
 /**
  * Categories Class.
@@ -91,7 +90,7 @@ class Categories implements CategoryInterface
 	 * @var    array
 	 * @since  1.6
 	 */
-	protected $_options = [];
+	protected $_options = null;
 
 	/**
 	 * Class constructor
@@ -124,8 +123,7 @@ class Categories implements CategoryInterface
 	 *
 	 * @return  Categories|boolean  Categories object on success, boolean false if an object does not exist
 	 *
-	 * @since       1.6
-	 * @deprecated  5.0 Use the ComponentInterface to get the categories
+	 * @since   1.6
 	 */
 	public static function getInstance($extension, $options = array())
 	{
@@ -136,36 +134,35 @@ class Categories implements CategoryInterface
 			return self::$instances[$hash];
 		}
 
-		$categories = null;
+		$parts = explode('.', $extension);
+		$component = 'com_' . strtolower($parts[0]);
+		$section = count($parts) > 1 ? $parts[1] : '';
+		$classname = ucfirst(substr($component, 4)) . ucfirst($section) . 'Categories';
 
-		try
+		if (!class_exists($classname))
 		{
-			$parts = explode('.', $extension, 2);
+			$path = JPATH_SITE . '/components/' . $component . '/helpers/category.php';
 
-			$component = Factory::getApplication()->bootComponent($parts[0]);
+			\JLoader::register($classname, $path);
 
-			if ($component instanceof CategoryServiceInterface)
+			if (!class_exists($classname))
 			{
-				$categories = $component->getCategory($options, \count($parts) > 1 ? $parts[1] : '');
+				return false;
 			}
 		}
-		catch (SectionNotFoundException $e)
-		{
-			$categories = null;
-		}
 
-		self::$instances[$hash] = $categories;
+		self::$instances[$hash] = new $classname($options);
 
 		return self::$instances[$hash];
 	}
 
 	/**
-	 * Loads a specific category and all its children in a CategoryNode object.
+	 * Loads a specific category and all its children in a CategoryNode object
 	 *
 	 * @param   mixed    $id         an optional id integer or equal to 'root'
 	 * @param   boolean  $forceload  True to force  the _load method to execute
 	 *
-	 * @return  CategoryNode|null  CategoryNode object or null if $id is not valid
+	 * @return  CategoryNode|null|boolean  CategoryNode object or null if $id is not valid
 	 *
 	 * @since   1.6
 	 */
@@ -192,8 +189,13 @@ class Categories implements CategoryInterface
 		{
 			return $this->_nodes[$id];
 		}
+		// If we processed this $id already and it was not valid, then return null.
+		elseif (isset($this->_checkedCategories[$id]))
+		{
+			return;
+		}
 
-		return null;
+		return false;
 	}
 
 	/**
@@ -219,114 +221,68 @@ class Categories implements CategoryInterface
 	 */
 	protected function _load($id)
 	{
-		/** @var \Joomla\Database\DatabaseDriver */
+		/** @var \JDatabaseDriver */
 		$db   = Factory::getDbo();
 		$app  = Factory::getApplication();
 		$user = Factory::getUser();
 		$extension = $this->_extension;
 
-		if ($id !== 'root')
-		{
-			$id = (int) $id;
-
-			if ($id === 0)
-			{
-				$id = 'root';
-			}
-		}
-
 		// Record that has this $id has been checked
 		$this->_checkedCategories[$id] = true;
 
 		$query = $db->getQuery(true)
-			->select(
-				[
-					$db->quoteName('c.id'),
-					$db->quoteName('c.asset_id'),
-					$db->quoteName('c.access'),
-					$db->quoteName('c.alias'),
-					$db->quoteName('c.checked_out'),
-					$db->quoteName('c.checked_out_time'),
-					$db->quoteName('c.created_time'),
-					$db->quoteName('c.created_user_id'),
-					$db->quoteName('c.description'),
-					$db->quoteName('c.extension'),
-					$db->quoteName('c.hits'),
-					$db->quoteName('c.language'),
-					$db->quoteName('c.level'),
-					$db->quoteName('c.lft'),
-					$db->quoteName('c.metadata'),
-					$db->quoteName('c.metadesc'),
-					$db->quoteName('c.metakey'),
-					$db->quoteName('c.modified_time'),
-					$db->quoteName('c.note'),
-					$db->quoteName('c.params'),
-					$db->quoteName('c.parent_id'),
-					$db->quoteName('c.path'),
-					$db->quoteName('c.published'),
-					$db->quoteName('c.rgt'),
-					$db->quoteName('c.title'),
-					$db->quoteName('c.modified_user_id'),
-					$db->quoteName('c.version'),
-				]
+			->select('c.id, c.asset_id, c.access, c.alias, c.checked_out, c.checked_out_time,
+				c.created_time, c.created_user_id, c.description, c.extension, c.hits, c.language, c.level,
+				c.lft, c.metadata, c.metadesc, c.metakey, c.modified_time, c.note, c.params, c.parent_id,
+				c.path, c.published, c.rgt, c.title, c.modified_user_id, c.version'
 			);
 
 		$case_when = ' CASE WHEN ';
-		$case_when .= $query->charLength($db->quoteName('c.alias'), '!=', '0');
+		$case_when .= $query->charLength('c.alias', '!=', '0');
 		$case_when .= ' THEN ';
-		$c_id = $query->castAsChar($db->quoteName('c.id'));
-		$case_when .= $query->concatenate(array($c_id, $db->quoteName('c.alias')), ':');
+		$c_id = $query->castAsChar('c.id');
+		$case_when .= $query->concatenate(array($c_id, 'c.alias'), ':');
 		$case_when .= ' ELSE ';
-		$case_when .= $c_id . ' END as ' . $db->quoteName('slug');
+		$case_when .= $c_id . ' END as slug';
 
 		$query->select($case_when)
-			->where('(' . $db->quoteName('c.extension') . ' = :extension OR ' . $db->quoteName('c.extension') . ' = ' . $db->quote('system') . ')')
-			->bind(':extension', $extension);
+			->where('(c.extension=' . $db->quote($extension) . ' OR c.extension=' . $db->quote('system') . ')');
 
 		if ($this->_options['access'])
 		{
-			$groups = $user->getAuthorisedViewLevels();
-			$query->whereIn($db->quoteName('c.access'), $groups);
+			$query->where('c.access IN (' . implode(',', $user->getAuthorisedViewLevels()) . ')');
 		}
 
 		if ($this->_options['published'] == 1)
 		{
-			$query->where($db->quoteName('c.published') . ' = 1');
+			$query->where('c.published = 1');
 		}
 
-		$query->order($db->quoteName('c.lft'));
+		$query->order('c.lft');
 
 		// Note: s for selected id
-		if ($id !== 'root')
+		if ($id != 'root')
 		{
 			// Get the selected category
 			$query->from($db->quoteName('#__categories', 's'))
-				->where($db->quoteName('s.id') . ' = :id')
-				->bind(':id', $id, ParameterType::INTEGER);
+				->where('s.id = ' . (int) $id);
 
 			if ($app->isClient('site') && Multilanguage::isEnabled())
 			{
 				// For the most part, we use c.lft column, which index is properly used instead of c.rgt
-				$query->join(
-					'INNER',
-					$db->quoteName('#__categories', 'c'),
-					'(' . $db->quoteName('s.lft') . ' < ' . $db->quoteName('c.lft')
-						. ' AND ' . $db->quoteName('c.lft') . ' < ' . $db->quoteName('s.rgt')
-						. ' AND ' . $db->quoteName('c.language')
-						. ' IN (' . implode(',', $query->bindArray([Factory::getLanguage()->getTag(), '*'], ParameterType::STRING)) . '))'
-						. ' OR (' . $db->quoteName('c.lft') . ' <= ' . $db->quoteName('s.lft')
-						. ' AND ' . $db->quoteName('s.rgt') . ' <= ' . $db->quoteName('c.rgt') . ')'
+				$query->innerJoin(
+					$db->quoteName('#__categories', 'c')
+					. ' ON (s.lft < c.lft AND c.lft < s.rgt AND c.language IN ('
+					. $db->quote(Factory::getLanguage()->getTag()) . ',' . $db->quote('*') . '))'
+					. ' OR (c.lft <= s.lft AND s.rgt <= c.rgt)'
 				);
 			}
 			else
 			{
-				$query->join(
-					'INNER',
-					$db->quoteName('#__categories', 'c'),
-					'(' . $db->quoteName('s.lft') . ' <= ' . $db->quoteName('c.lft')
-						. ' AND ' . $db->quoteName('c.lft') . ' < ' . $db->quoteName('s.rgt') . ')'
-						. ' OR (' . $db->quoteName('c.lft') . ' < ' . $db->quoteName('s.lft')
-						. ' AND ' . $db->quoteName('s.rgt') . ' < ' . $db->quoteName('c.rgt') . ')'
+				$query->innerJoin(
+					$db->quoteName('#__categories', 'c')
+					. ' ON (s.lft <= c.lft AND c.lft < s.rgt)'
+					. ' OR (c.lft < s.lft AND s.rgt < c.rgt)'
 				);
 			}
 		}
@@ -336,7 +292,7 @@ class Categories implements CategoryInterface
 
 			if ($app->isClient('site') && Multilanguage::isEnabled())
 			{
-				$query->whereIn($db->quoteName('c.language'), [Factory::getLanguage()->getTag(), '*'], ParameterType::STRING);
+				$query->where('c.language IN (' . $db->quote(Factory::getLanguage()->getTag()) . ',' . $db->quote('*') . ')');
 			}
 		}
 
@@ -344,24 +300,23 @@ class Categories implements CategoryInterface
 		if ($this->_options['countItems'] == 1)
 		{
 			$subQuery = $db->getQuery(true)
-				->select('COUNT(' . $db->quoteName($db->escape('i.' . $this->_key)) . ')')
-				->from($db->quoteName($db->escape($this->_table), 'i'))
-				->where($db->quoteName($db->escape('i.' . $this->_field)) . ' = ' . $db->quoteName('c.id'));
+				->select('COUNT(i.' . $db->quoteName($this->_key) . ')')
+				->from($db->quoteName($this->_table, 'i'))
+				->where('i.' . $db->quoteName($this->_field) . ' = c.id');
 
 			if ($this->_options['published'] == 1)
 			{
-				$subQuery->where($db->quoteName($db->escape('i.' . $this->_statefield)) . ' = 1');
+				$subQuery->where('i.' . $this->_statefield . ' = 1');
 			}
 
 			if ($this->_options['currentlang'] !== 0)
 			{
-				$subQuery->where(
-					$db->quoteName('i.language')
-						. ' IN (' . implode(',', $query->bindArray([$this->_options['currentlang'], '*'], ParameterType::STRING)) . ')'
+				$subQuery->where('(i.language = ' . $db->quote('*')
+					. ' OR i.language = ' . $db->quote($this->_options['currentlang']) . ')'
 				);
 			}
 
-			$query->select('(' . $subQuery . ') AS ' . $db->quoteName('numitems'));
+			$query->select('(' . $subQuery . ') AS numitems');
 		}
 
 		// Get the results
@@ -369,7 +324,7 @@ class Categories implements CategoryInterface
 		$results = $db->loadObjectList('id');
 		$childrenLoaded = false;
 
-		if (\count($results))
+		if (count($results))
 		{
 			// Foreach categories
 			foreach ($results as $result)
@@ -393,7 +348,7 @@ class Categories implements CategoryInterface
 					$this->_nodes[$result->id] = new CategoryNode($result, $this);
 
 					// If this is not root and if the current node's parent is in the list or the current node parent is 0
-					if ($result->id !== 'root' && (isset($this->_nodes[$result->parent_id]) || $result->parent_id == 1))
+					if ($result->id != 'root' && (isset($this->_nodes[$result->parent_id]) || $result->parent_id == 1))
 					{
 						// Compute relationship between node and its parent - set the parent in the _nodes field
 						$this->_nodes[$result->id]->setParent($this->_nodes[$result->parent_id]);
@@ -418,7 +373,7 @@ class Categories implements CategoryInterface
 					// Create the CategoryNode
 					$this->_nodes[$result->id] = new CategoryNode($result, $this);
 
-					if ($result->id !== 'root' && (isset($this->_nodes[$result->parent_id]) || $result->parent_id))
+					if ($result->id != 'root' && (isset($this->_nodes[$result->parent_id]) || $result->parent_id))
 					{
 						// Compute relationship between node and its parent
 						$this->_nodes[$result->id]->setParent($this->_nodes[$result->parent_id]);

@@ -8,24 +8,20 @@
  */
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Plugin\PluginHelper;
-
 /**
  * UrlFolderInstaller Plugin.
  *
  * @since  3.6.0
  */
-class PlgInstallerUrlInstaller extends CMSPlugin
+class PlgInstallerUrlInstaller extends JPlugin
 {
 	/**
-	 * Application object.
+	 * Load the language file on instantiation.
 	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
-	 * @since  4.0.0
+	 * @var    boolean
+	 * @since  3.6.0
 	 */
-	protected $app;
+	protected $autoloadLanguage = true;
 
 	/**
 	 * Textfield or Form of the Plugin.
@@ -36,16 +32,13 @@ class PlgInstallerUrlInstaller extends CMSPlugin
 	 */
 	public function onInstallerAddInstallationTab()
 	{
-		// Load language files
-		$this->loadLanguage();
-
 		$tab            = array();
 		$tab['name']    = 'url';
-		$tab['label']   = Text::_('PLG_INSTALLER_URLINSTALLER_TEXT');
+		$tab['label']   = JText::_('PLG_INSTALLER_URLINSTALLER_TEXT');
 
 		// Render the input
 		ob_start();
-		include PluginHelper::getLayoutPath('installer', 'urlinstaller');
+		include JPluginHelper::getLayoutPath('installer', 'urlinstaller');
 		$tab['content'] = ob_get_clean();
 
 		return $tab;

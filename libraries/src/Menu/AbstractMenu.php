@@ -8,10 +8,9 @@
 
 namespace Joomla\CMS\Menu;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
 use Joomla\CMS\User\User;
 use Joomla\Registry\Registry;
 
@@ -19,41 +18,41 @@ use Joomla\Registry\Registry;
  * Menu class
  *
  * @since  1.5
+ * @note   Will become abstract in Joomla 4
  */
-abstract class AbstractMenu
+class AbstractMenu
 {
 	/**
 	 * Array to hold the menu items
 	 *
 	 * @var    MenuItem[]
-	 *
-	 * @since  4.0.0
+	 * @since       1.5
+	 * @deprecated  4.0  Will convert to $items
 	 */
-	protected $items = array();
+	protected $_items = array();
 
 	/**
-	 * Identifier of the default menu item. Key of the array is the language.
+	 * Identifier of the default menu item
 	 *
-	 * @var    integer[]
-	 *
-	 * @since  4.0.0
+	 * @var    integer
+	 * @since       1.5
+	 * @deprecated  4.0  Will convert to $default
 	 */
-	protected $default = array();
+	protected $_default = array();
 
 	/**
 	 * Identifier of the active menu item
 	 *
 	 * @var    integer
-	 *
-	 * @since  4.0.0
+	 * @since       1.5
+	 * @deprecated  4.0  Will convert to $active
 	 */
-	protected $active = 0;
+	protected $_active = 0;
 
 	/**
 	 * Menu instances container.
 	 *
 	 * @var    AbstractMenu[]
-	 *
 	 * @since  1.7
 	 */
 	protected static $instances = array();
@@ -62,19 +61,9 @@ abstract class AbstractMenu
 	 * User object to check access levels for
 	 *
 	 * @var    User
-	 *
 	 * @since  3.9.26
 	 */
 	protected $storedUser;
-
-	/**
-	 * Flag for checking if the menu items have been loaded
-	 *
-	 * @var    boolean
-	 *
-	 * @since  4.0.0
-	 */
-	private $itemsLoaded = false;
 
 	/**
 	 * Class constructor
@@ -85,6 +74,17 @@ abstract class AbstractMenu
 	 */
 	public function __construct($options = array())
 	{
+		// Load the menu items
+		$this->load();
+
+		foreach ($this->_items as $item)
+		{
+			if ($item->home)
+			{
+				$this->_default[trim($item->language)] = $item->id;
+			}
+		}
+
 		/**
 		 * It is preferred NOT to inject and store the user when constructing the menu object,
 		 * at least for the Menu object used by Joomla.
@@ -92,10 +92,9 @@ abstract class AbstractMenu
 		 * but the user can be updated later (by the Remember me plugin for instance). As the stored
 		 * user object is not updated, the menu will render incorrectly, not complying with
 		 * menu items access levels.
-		 *
-		 * @see https://github.com/joomla/joomla-cms/issues/11541
+		 * See https://github.com/joomla/joomla-cms/issues/11541
 		 */
-		$this->storedUser = isset($options['user']) && $options['user'] instanceof User ? $options['user'] : null;
+		$this->storedUser = isset($options['user']) && $options['user'] instanceof \JUser ? $options['user'] : null;
 	}
 
 	/**
@@ -106,22 +105,41 @@ abstract class AbstractMenu
 	 *
 	 * @return  AbstractMenu  A menu object.
 	 *
-	 * @since       1.5
-	 *
-	 * @throws      \Exception
-	 *
-	 * @deprecated  5.0 Use the MenuFactoryInterface from the container instead
+	 * @throws  \Exception
+	 * @since   1.5
 	 */
 	public static function getInstance($client, $options = array())
 	{
-		if (!$client)
-		{
-			throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_MENU_LOAD', $client), 500);
-		}
-
 		if (empty(self::$instances[$client]))
 		{
-			self::$instances[$client] = Factory::getContainer()->get(MenuFactoryInterface::class)->createMenu($client, $options);
+			// Create a Menu object
+			$classname = 'JMenu' . ucfirst($client);
+
+			if (!class_exists($classname))
+			{
+				// @deprecated 4.0 Everything in this block is deprecated but the warning is only logged after the file_exists
+				// Load the menu object
+				$info = \JApplicationHelper::getClientInfo($client, true);
+
+				if (is_object($info))
+				{
+					$path = $info->path . '/includes/menu.php';
+
+					\JLoader::register($classname, $path);
+
+					if (class_exists($classname))
+					{
+						\JLog::add('Non-autoloadable Menu subclasses are deprecated, support will be removed in 4.0.', \JLog::WARNING, 'deprecated');
+					}
+				}
+			}
+
+			if (!class_exists($classname))
+			{
+				throw new \Exception(\JText::sprintf('JLIB_APPLICATION_ERROR_MENU_LOAD', $client), 500);
+			}
+
+			self::$instances[$client] = new $classname($options);
 		}
 
 		return self::$instances[$client];
@@ -132,7 +150,7 @@ abstract class AbstractMenu
 	 *
 	 * @param   User  $user  The new user to set.
 	 *
-	 * @return  void
+	 * @return null
 	 *
 	 * @since 3.9.26
 	 */
@@ -154,9 +172,9 @@ abstract class AbstractMenu
 	{
 		$result = null;
 
-		if (isset($this->getMenu()[$id]))
+		if (isset($this->_items[$id]))
 		{
-			$result = &$this->getMenu()[$id];
+			$result = &$this->_items[$id];
 		}
 
 		return $result;
@@ -174,9 +192,9 @@ abstract class AbstractMenu
 	 */
 	public function setDefault($id, $language = '*')
 	{
-		if (isset($this->getMenu()[$id]))
+		if (isset($this->_items[$id]))
 		{
-			$this->default[$language] = $id;
+			$this->_default[$language] = $id;
 
 			return true;
 		}
@@ -189,24 +207,23 @@ abstract class AbstractMenu
 	 *
 	 * @param   string  $language  The language code, default value of * means all.
 	 *
-	 * @return  MenuItem|void  The item object or null when not found for given language
+	 * @return  MenuItem|null  The item object or null when not found for given language
 	 *
 	 * @since   1.5
 	 */
 	public function getDefault($language = '*')
 	{
-		// Get menu items first to ensure defaults have been populated
-		$items = $this->getMenu();
-
-		if (\array_key_exists($language, $this->default))
+		if (array_key_exists($language, $this->_default))
 		{
-			return $items[$this->default[$language]];
+			return $this->_items[$this->_default[$language]];
 		}
 
-		if (\array_key_exists('*', $this->default))
+		if (array_key_exists('*', $this->_default))
 		{
-			return $items[$this->default['*']];
+			return $this->_items[$this->_default['*']];
 		}
+
+		return;
 	}
 
 	/**
@@ -214,33 +231,37 @@ abstract class AbstractMenu
 	 *
 	 * @param   integer  $id  The item id
 	 *
-	 * @return  MenuItem|void  The menu item representing the given ID if present or null otherwise
+	 * @return  MenuItem|null  The menu item representing the given ID if present or null otherwise
 	 *
 	 * @since   1.5
 	 */
 	public function setActive($id)
 	{
-		if (isset($this->getMenu()[$id]))
+		if (isset($this->_items[$id]))
 		{
-			$this->active = $id;
+			$this->_active = $id;
 
-			return $this->getMenu()[$id];
+			return $this->_items[$id];
 		}
+
+		return;
 	}
 
 	/**
 	 * Get menu item by id.
 	 *
-	 * @return  MenuItem|void  The item object if an active menu item has been set or null
+	 * @return  MenuItem|null  The item object if an active menu item has been set or null
 	 *
 	 * @since   1.5
 	 */
 	public function getActive()
 	{
-		if ($this->active)
+		if ($this->_active)
 		{
-			return $this->getMenu()[$this->active];
+			return $this->_items[$this->_active];
 		}
+
+		return;
 	}
 
 	/**
@@ -260,11 +281,11 @@ abstract class AbstractMenu
 		$items      = array();
 		$attributes = (array) $attributes;
 		$values     = (array) $values;
-		$count      = \count($attributes);
+		$count      = count($attributes);
 
-		foreach ($this->getMenu() as $item)
+		foreach ($this->_items as $item)
 		{
-			if (!\is_object($item))
+			if (!is_object($item))
 			{
 				continue;
 			}
@@ -273,9 +294,9 @@ abstract class AbstractMenu
 
 			for ($i = 0; $i < $count; $i++)
 			{
-				if (\is_array($values[$i]))
+				if (is_array($values[$i]))
 				{
-					if (!\in_array($item->{$attributes[$i]}, $values[$i]))
+					if (!in_array($item->{$attributes[$i]}, $values[$i]))
 					{
 						$test = false;
 						break;
@@ -318,7 +339,7 @@ abstract class AbstractMenu
 	{
 		if ($menu = $this->getItem($id))
 		{
-			return $menu->getParams();
+			return $menu->params;
 		}
 
 		return new Registry;
@@ -333,22 +354,7 @@ abstract class AbstractMenu
 	 */
 	public function getMenu()
 	{
-		if (!$this->itemsLoaded)
-		{
-			$this->load();
-
-			foreach ($this->items as $item)
-			{
-				if ($item->home)
-				{
-					$this->default[trim($item->language)] = $item->id;
-				}
-			}
-
-			$this->itemsLoaded = true;
-		}
-
-		return $this->items;
+		return $this->_items;
 	}
 
 	/**
@@ -366,15 +372,7 @@ abstract class AbstractMenu
 
 		if ($menu)
 		{
-			$access = (int) $menu->access;
-
-			// If the access level is public we don't need to load the user session
-			if ($access === 1)
-			{
-				return true;
-			}
-
-			return \in_array($access, $this->user->getAuthorisedViewLevels(), true);
+			return in_array((int) $menu->access, $this->user->getAuthorisedViewLevels());
 		}
 
 		return true;
@@ -387,7 +385,10 @@ abstract class AbstractMenu
 	 *
 	 * @since   1.5
 	 */
-	abstract public function load();
+	public function load()
+	{
+		return array();
+	}
 
 	/**
 	 * Internal getter for the user. Returns the injected
@@ -426,7 +427,6 @@ abstract class AbstractMenu
 				? Factory::getUser()
 				: $this->storedUser;
 		}
-
-		return null;
 	}
 }
+

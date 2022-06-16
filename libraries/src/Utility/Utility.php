@@ -8,9 +8,7 @@
 
 namespace Joomla\CMS\Utility;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\HTML\HTMLHelper;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * JUtility is a utility functions class
@@ -36,9 +34,9 @@ class Utility
 		// Let's grab all the key/value pairs using a regular expression
 		preg_match_all('/([\w:-]+)[\s]?=[\s]?"([^"]*)"/i', $string, $attr);
 
-		if (\is_array($attr))
+		if (is_array($attr))
 		{
-			$numPairs = \count($attr[1]);
+			$numPairs = count($attr[1]);
 
 			for ($i = 0; $i < $numPairs; $i++)
 			{
@@ -54,7 +52,7 @@ class Utility
 	 *
 	 * @param   mixed  $custom  A custom upper limit, if the PHP settings are all above this then this will be used
 	 *
-	 * @return  mixed  Size in number of bytes
+	 * @return  integer  Size in number of bytes
 	 *
 	 * @since   3.7.0
 	 */
@@ -62,7 +60,7 @@ class Utility
 	{
 		if ($custom)
 		{
-			$custom = HTMLHelper::_('number.bytes', $custom, '');
+			$custom = \JHtml::_('number.bytes', $custom, '');
 
 			if ($custom > 0)
 			{
@@ -74,8 +72,8 @@ class Utility
 		 * Read INI settings which affects upload size limits
 		 * and Convert each into number of bytes so that we can compare
 		 */
-		$sizes[] = HTMLHelper::_('number.bytes', ini_get('post_max_size'), '');
-		$sizes[] = HTMLHelper::_('number.bytes', ini_get('upload_max_filesize'), '');
+		$sizes[] = \JHtml::_('number.bytes', ini_get('post_max_size'), '');
+		$sizes[] = \JHtml::_('number.bytes', ini_get('upload_max_filesize'), '');
 
 		// The minimum of these is the limiting factor
 		return min($sizes);

@@ -8,10 +8,10 @@
 
 namespace Joomla\CMS\Crypt\Cipher;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\Crypt\CipherInterface;
-use Joomla\Crypt\Key;
+use Joomla\CMS\Crypt\CipherInterface;
+use Joomla\CMS\Crypt\Key;
 
 /**
  * Crypt cipher for encryption, decryption and key generation via the php-encryption library.
@@ -35,15 +35,15 @@ class CryptoCipher implements CipherInterface
 	public function decrypt($data, Key $key)
 	{
 		// Validate key.
-		if ($key->getType() !== 'crypto')
+		if ($key->type != 'crypto')
 		{
-			throw new \InvalidArgumentException('Invalid key of type: ' . $key->getType() . '.  Expected crypto.');
+			throw new \InvalidArgumentException('Invalid key of type: ' . $key->type . '.  Expected crypto.');
 		}
 
 		// Decrypt the data.
 		try
 		{
-			return \Crypto::Decrypt($data, $key->getPublic());
+			return \Crypto::Decrypt($data, $key->public);
 		}
 		catch (\InvalidCiphertextException $ex)
 		{
@@ -73,15 +73,15 @@ class CryptoCipher implements CipherInterface
 	public function encrypt($data, Key $key)
 	{
 		// Validate key.
-		if ($key->getType() !== 'crypto')
+		if ($key->type != 'crypto')
 		{
-			throw new \InvalidArgumentException('Invalid key of type: ' . $key->getType() . '.  Expected crypto.');
+			throw new \InvalidArgumentException('Invalid key of type: ' . $key->type . '.  Expected crypto.');
 		}
 
 		// Encrypt the data.
 		try
 		{
-			return \Crypto::Encrypt($data, $key->getPublic());
+			return \Crypto::Encrypt($data, $key->public);
 		}
 		catch (\CryptoTestFailedException $ex)
 		{
@@ -105,10 +105,13 @@ class CryptoCipher implements CipherInterface
 	 */
 	public function generateKey(array $options = array())
 	{
+		// Create the new encryption key object.
+		$key = new Key('crypto');
+
 		// Generate the encryption key.
 		try
 		{
-			$public = \Crypto::CreateNewRandomKey();
+			$key->public = \Crypto::CreateNewRandomKey();
 		}
 		catch (\CryptoTestFailedException $ex)
 		{
@@ -120,29 +123,8 @@ class CryptoCipher implements CipherInterface
 		}
 
 		// Explicitly flag the private as unused in this cipher.
-		$private = 'unused';
+		$key->private = 'unused';
 
-		return new Key('crypto', $private, $public);
-	}
-
-	/**
-	 * Check if the cipher is supported in this environment.
-	 *
-	 * @return  boolean
-	 *
-	 * @since   4.0.0
-	 */
-	public static function isSupported(): bool
-	{
-		try
-		{
-			\Crypto::RuntimeTest();
-
-			return true;
-		}
-		catch (\CryptoTestFailedException $e)
-		{
-			return false;
-		}
+		return $key;
 	}
 }

@@ -8,10 +8,11 @@
 
 namespace Joomla\CMS\Language;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\HTML\HTMLHelper;
+use Joomla\CMS\Log\Log;
 
 /**
  * Text handling class.
@@ -32,7 +33,7 @@ class Text
 	 * Translates a string into the current language.
 	 *
 	 * Examples:
-	 * `<script>alert(Joomla.Text._('<?php echo Text::_("JDEFAULT", array("script"=>true)); ?>'));</script>`
+	 * `<script>alert(Joomla.JText._('<?php echo Text::_("JDEFAULT", array("script"=>true)); ?>'));</script>`
 	 * will generate an alert message containing 'Default'
 	 * `<?php echo Text::_("JDEFAULT"); ?>` will generate a 'Default' string
 	 *
@@ -47,19 +48,19 @@ class Text
 	 */
 	public static function _($string, $jsSafe = false, $interpretBackSlashes = true, $script = false)
 	{
-		if (\is_array($jsSafe))
+		if (is_array($jsSafe))
 		{
-			if (\array_key_exists('interpretBackSlashes', $jsSafe))
+			if (array_key_exists('interpretBackSlashes', $jsSafe))
 			{
 				$interpretBackSlashes = (boolean) $jsSafe['interpretBackSlashes'];
 			}
 
-			if (\array_key_exists('script', $jsSafe))
+			if (array_key_exists('script', $jsSafe))
 			{
 				$script = (boolean) $jsSafe['script'];
 			}
 
-			$jsSafe = \array_key_exists('jsSafe', $jsSafe) ? (boolean) $jsSafe['jsSafe'] : false;
+			$jsSafe = array_key_exists('jsSafe', $jsSafe) ? (boolean) $jsSafe['jsSafe'] : false;
 		}
 
 		if (self::passSprintf($string, $jsSafe, $interpretBackSlashes, $script))
@@ -183,7 +184,7 @@ class Text
 	 * script is a boolean to indicate that the string will be push in the javascript language store.
 	 *
 	 * Examples:
-	 * `<script>alert(Joomla.Text._('<?php echo Text::plural("COM_PLUGINS_N_ITEMS_UNPUBLISHED", 1, array("script"=>true)); ?>'));</script>`
+	 * `<script>alert(Joomla.JText._('<?php echo Text::plural("COM_PLUGINS_N_ITEMS_UNPUBLISHED", 1, array("script"=>true)); ?>'));</script>`
 	 * will generate an alert message containing '1 plugin successfully disabled'
 	 * `<?php echo Text::plural('COM_PLUGINS_N_ITEMS_UNPUBLISHED', 1); ?>` will generate a '1 plugin successfully disabled' string
 	 *
@@ -197,8 +198,21 @@ class Text
 	public static function plural($string, $n)
 	{
 		$lang = Factory::getLanguage();
-		$args = \func_get_args();
-		$count = \count($args);
+		$args = func_get_args();
+		$count = count($args);
+
+		if ($count < 1)
+		{
+			return '';
+		}
+
+		if ($count == 1)
+		{
+			// Default to the normal sprintf handling.
+			$args[0] = $lang->_($string);
+
+			return call_user_func_array('sprintf', $args);
+		}
 
 		// Try the key from the language plural potential suffixes
 		$found = false;
@@ -228,16 +242,16 @@ class Text
 			$key = $string;
 		}
 
-		if (\is_array($args[$count - 1]))
+		if (is_array($args[$count - 1]))
 		{
 			$args[0] = $lang->_(
-				$key, \array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
-				\array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
+				$key, array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
+				array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
 			);
 
-			if (\array_key_exists('script', $args[$count - 1]) && $args[$count - 1]['script'])
+			if (array_key_exists('script', $args[$count - 1]) && $args[$count - 1]['script'])
 			{
-				static::$strings[$key] = \call_user_func_array('sprintf', $args);
+				static::$strings[$key] = call_user_func_array('sprintf', $args);
 
 				return $key;
 			}
@@ -247,7 +261,7 @@ class Text
 			$args[0] = $lang->_($key);
 		}
 
-		return \call_user_func_array('sprintf', $args);
+		return call_user_func_array('sprintf', $args);
 	}
 
 	/**
@@ -274,19 +288,24 @@ class Text
 	public static function sprintf($string)
 	{
 		$lang = Factory::getLanguage();
-		$args = \func_get_args();
-		$count = \count($args);
+		$args = func_get_args();
+		$count = count($args);
 
-		if (\is_array($args[$count - 1]))
+		if ($count < 1)
+		{
+			return '';
+		}
+
+		if (is_array($args[$count - 1]))
 		{
 			$args[0] = $lang->_(
-				$string, \array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
-				\array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
+				$string, array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
+				array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
 			);
 
-			if (\array_key_exists('script', $args[$count - 1]) && $args[$count - 1]['script'])
+			if (array_key_exists('script', $args[$count - 1]) && $args[$count - 1]['script'])
 			{
-				static::$strings[$string] = \call_user_func_array('sprintf', $args);
+				static::$strings[$string] = call_user_func_array('sprintf', $args);
 
 				return $string;
 			}
@@ -299,7 +318,7 @@ class Text
 		// Replace custom named placeholders with sprintf style placeholders
 		$args[0] = preg_replace('/\[\[%([0-9]+):[^\]]*\]\]/', '%\1$s', $args[0]);
 
-		return \call_user_func_array('sprintf', $args);
+		return call_user_func_array('sprintf', $args);
 	}
 
 	/**
@@ -316,14 +335,19 @@ class Text
 	public static function printf($string)
 	{
 		$lang = Factory::getLanguage();
-		$args = \func_get_args();
-		$count = \count($args);
+		$args = func_get_args();
+		$count = count($args);
 
-		if (\is_array($args[$count - 1]))
+		if ($count < 1)
+		{
+			return '';
+		}
+
+		if (is_array($args[$count - 1]))
 		{
 			$args[0] = $lang->_(
-				$string, \array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
-				\array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
+				$string, array_key_exists('jsSafe', $args[$count - 1]) ? $args[$count - 1]['jsSafe'] : false,
+				array_key_exists('interpretBackSlashes', $args[$count - 1]) ? $args[$count - 1]['interpretBackSlashes'] : true
 			);
 		}
 		else
@@ -331,7 +355,7 @@ class Text
 			$args[0] = $lang->_($string);
 		}
 
-		return \call_user_func_array('printf', $args);
+		return call_user_func_array('printf', $args);
 	}
 
 	/**
@@ -341,7 +365,7 @@ class Text
 	 * @param   boolean  $jsSafe                Ensure the output is JavaScript safe.
 	 * @param   boolean  $interpretBackSlashes  Interpret \t and \n.
 	 *
-	 * @return  array
+	 * @return  string
 	 *
 	 * @since   1.7.0
 	 */
@@ -349,25 +373,26 @@ class Text
 	{
 		if ($string === null)
 		{
-			@trigger_error(
+			Log::add(
 				sprintf(
 					'As of 3.7.0, passing a null value for the first argument of %1$s() is deprecated and will not be supported in 4.0.'
 					. ' Use the %2$s::getScriptStrings() method to get the strings from the JavaScript language store instead.',
 					__METHOD__,
 					__CLASS__
 				),
-				E_USER_DEPRECATED
+				Log::WARNING,
+				'deprecated'
 			);
 		}
 
-		if (\is_array($jsSafe))
+		if (is_array($jsSafe))
 		{
-			if (\array_key_exists('interpretBackSlashes', $jsSafe))
+			if (array_key_exists('interpretBackSlashes', $jsSafe))
 			{
 				$interpretBackSlashes = (boolean) $jsSafe['interpretBackSlashes'];
 			}
 
-			if (\array_key_exists('jsSafe', $jsSafe))
+			if (array_key_exists('jsSafe', $jsSafe))
 			{
 				$jsSafe = (boolean) $jsSafe['jsSafe'];
 			}
@@ -386,7 +411,7 @@ class Text
 			// Load core.js dependency
 			HTMLHelper::_('behavior.core');
 
-			// Update Joomla.Text script options
+			// Update Joomla.JText script options
 			Factory::getDocument()->addScriptOptions('joomla.jtext', static::$strings, false);
 		}
 

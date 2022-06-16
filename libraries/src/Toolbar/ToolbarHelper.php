@@ -8,12 +8,12 @@
 
 namespace Joomla\CMS\Toolbar;
 
-\defined('_JEXEC') or die;
+defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
 use Joomla\CMS\Layout\FileLayout;
 use Joomla\CMS\Table\Table;
+use Joomla\CMS\Factory;
+use Joomla\CMS\Language\Text;
 use Joomla\CMS\Uri\Uri;
 
 /**
@@ -43,14 +43,7 @@ abstract class ToolbarHelper
 
 		$app = Factory::getApplication();
 		$app->JComponentTitle = $html;
-		$title = strip_tags($title) . ' - ' . $app->get('sitename');
-
-		if ($app->isClient('administrator'))
-		{
-			$title .= ' - ' . Text::_('JADMINISTRATION');
-		}
-
-		Factory::getDocument()->setTitle($title);
+		Factory::getDocument()->setTitle(strip_tags($title) . ' - ' . $app->get('sitename') . ' - ' . Text::_('JADMINISTRATION'));
 	}
 
 	/**
@@ -90,16 +83,15 @@ abstract class ToolbarHelper
 	 *
 	 * @param   string  $task        The task to perform (picked up by the switch($task) blocks).
 	 * @param   string  $icon        The image to display.
-	 * @param   string  $iconOver    @deprecated 5.0
+	 * @param   string  $iconOver    The image to display when moused over.
 	 * @param   string  $alt         The alt text for the icon image.
 	 * @param   bool    $listSelect  True if required to check that a standard list item is checked.
-	 * @param   string  $formId      The id of action form.
 	 *
 	 * @return  void
 	 *
 	 * @since   1.5
 	 */
-	public static function custom($task = '', $icon = '', $iconOver = '', $alt = '', $listSelect = true, $formId = null)
+	public static function custom($task = '', $icon = '', $iconOver = '', $alt = '', $listSelect = true)
 	{
 		$bar = Toolbar::getInstance('toolbar');
 
@@ -107,53 +99,29 @@ abstract class ToolbarHelper
 		$icon = preg_replace('#\.[^.]*$#', '', $icon);
 
 		// Add a standard button.
-		$bar->appendButton('Standard', $icon, $alt, $task, $listSelect, $formId);
+		$bar->appendButton('Standard', $icon, $alt, $task, $listSelect);
 	}
 
 	/**
 	 * Writes a preview button for a given option (opens a popup window).
 	 *
-	 * @param   string   $url            The name of the popup file (excluding the file extension)
-	 * @param   bool     $updateEditors  Unused
-	 * @param   string   $icon           The image to display.
-	 * @param   integer  $bodyHeight     The body height of the preview popup
-	 * @param   integer  $modalWidth     The modal width of the preview popup
+	 * @param   string  $url            The name of the popup file (excluding the file extension)
+	 * @param   bool    $updateEditors  Unused
 	 *
 	 * @return  void
 	 *
 	 * @since   1.5
 	 */
-	public static function preview($url = '', $updateEditors = false, $icon = 'preview', $bodyHeight = null, $modalWidth = null)
+	public static function preview($url = '', $updateEditors = false)
 	{
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a preview button.
-		$bar->appendButton('Popup', $icon, 'Preview', $url . '&task=preview', 640, 480, $bodyHeight, $modalWidth);
+		$bar->appendButton('Popup', 'preview', 'Preview', $url . '&task=preview');
 	}
 
 	/**
-	 * Writes a jooa11y accessibility checker button for a given option (opens a popup window).
-	 *
-	 * @param   string   $url            The url to open
-	 * @param   bool     $updateEditors  Unused
-	 * @param   string   $icon           The image to display.
-	 * @param   integer  $bodyHeight     The body height of the preview popup
-	 * @param   integer  $modalWidth     The modal width of the preview popup
-	 *
-	 * @return  void
-	 *
-	 * @since   4.1.0
-	 */
-	public static function jooa11y($url = '', $updateEditors = false, $icon = 'icon-universal-access', $bodyHeight = null, $modalWidth = null)
-	{
-		$bar = Toolbar::getInstance('toolbar');
-
-		// Add a button.
-		$bar->appendButton('Popup', $icon, 'Preview', $url . '&task=preview', 640, 480, $bodyHeight, $modalWidth);
-	}
-
-	/**
-	 * Writes a help button for a given option (opens a popup window).
+	 * Writes a preview button for a given option (opens a popup window).
 	 *
 	 * @param   string  $ref        The name of the popup file (excluding the file extension for an xml file).
 	 * @param   bool    $com        Use the help file in the component directory.
@@ -166,35 +134,10 @@ abstract class ToolbarHelper
 	 */
 	public static function help($ref, $com = false, $override = null, $component = null)
 	{
-		// Don't show a help button if neither $ref nor $override is given
-		if (!$ref && !$override)
-		{
-			return;
-		}
-
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a help button.
 		$bar->appendButton('Help', $ref, $com, $override, $component);
-	}
-
-	/**
-	 * Writes a help button for showing/hiding the inline help of a form
-	 *
-	 * @param   string  $class   The class used by the inline help items.
-	 *
-	 * @return  void
-	 *
-	 * @since   4.1.0
-	 */
-	public static function inlinehelp(string $class = "hide-aware-inline-help")
-	{
-		$bar = Toolbar::getInstance('toolbar');
-
-		// Add a help button.
-		$bar->inlinehelpButton('inlinehelp')
-			->targetclass($class)
-			->icon('fa fa-question-circle');
 	}
 
 	/**
@@ -213,8 +156,7 @@ abstract class ToolbarHelper
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a back button.
-		$arrow  = Factory::getLanguage()->isRtl() ? 'arrow-right' : 'arrow-left';
-		$bar->appendButton('Link', $arrow, $alt, $href);
+		$bar->appendButton('Link', 'back', $alt, $href);
 	}
 
 	/**
@@ -533,15 +475,15 @@ abstract class ToolbarHelper
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add an apply button
-		$bar->apply($task, $alt);
+		$bar->appendButton('Standard', 'apply', $alt, $task, false);
 	}
 
 	/**
 	 * Writes a save button for a given option.
 	 * Save operation leads to a save and then close action.
 	 *
-	 * @param   string   $task  An override for the task.
-	 * @param   string   $alt   An override for the alt text.
+	 * @param   string  $task  An override for the task.
+	 * @param   string  $alt   An override for the alt text.
 	 *
 	 * @return  void
 	 *
@@ -552,15 +494,15 @@ abstract class ToolbarHelper
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a save button.
-		$bar->save($task, $alt);
+		$bar->appendButton('Standard', 'save', $alt, $task, false);
 	}
 
 	/**
 	 * Writes a save and create new button for a given option.
 	 * Save and create operation leads to a save and then add action.
 	 *
-	 * @param   string   $task  An override for the task.
-	 * @param   string   $alt   An override for the alt text.
+	 * @param   string  $task  An override for the task.
+	 * @param   string  $alt   An override for the alt text.
 	 *
 	 * @return  void
 	 *
@@ -571,7 +513,7 @@ abstract class ToolbarHelper
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a save and create new button.
-		$bar->save2new($task, $alt);
+		$bar->appendButton('Standard', 'save-new', $alt, $task, false);
 	}
 
 	/**
@@ -579,8 +521,8 @@ abstract class ToolbarHelper
 	 * Save as copy operation leads to a save after clearing the key,
 	 * then returns user to edit mode with new key.
 	 *
-	 * @param   string   $task  An override for the task.
-	 * @param   string   $alt   An override for the alt text.
+	 * @param   string  $task  An override for the task.
+	 * @param   string  $alt   An override for the alt text.
 	 *
 	 * @return  void
 	 *
@@ -591,7 +533,7 @@ abstract class ToolbarHelper
 		$bar = Toolbar::getInstance('toolbar');
 
 		// Add a save and create new button.
-		$bar->save2copy($task, $alt);
+		$bar->appendButton('Standard', 'save-copy', $alt, $task, false);
 	}
 
 	/**
@@ -638,13 +580,13 @@ abstract class ToolbarHelper
 	 * @param   integer  $height     The height of the popup. [UNUSED]
 	 * @param   integer  $width      The width of the popup. [UNUSED]
 	 * @param   string   $alt        The name of the button.
-	 * @param   string   $path       An alternative path for the configuration xml relative to JPATH_SITE.
+	 * @param   string   $path       An alternative path for the configuation xml relative to JPATH_SITE.
 	 *
 	 * @return  void
 	 *
 	 * @since   1.5
 	 */
-	public static function preferences($component, $height = 550, $width = 875, $alt = 'JTOOLBAR_OPTIONS', $path = '')
+	public static function preferences($component, $height = '550', $width = '875', $alt = 'JToolbar_Options', $path = '')
 	{
 		$component = urlencode($component);
 		$path = urlencode($path);
@@ -679,64 +621,21 @@ abstract class ToolbarHelper
 	{
 		$lang = Factory::getLanguage();
 		$lang->load('com_contenthistory', JPATH_ADMINISTRATOR, $lang->getTag(), true);
-
-		/** @var \Joomla\CMS\Table\ContentType $contentTypeTable */
 		$contentTypeTable = Table::getInstance('Contenttype');
 		$typeId           = $contentTypeTable->getTypeId($typeAlias);
 
-		// Options array for Layout
+		// Options array for JLayout
 		$options              = array();
 		$options['title']     = Text::_($alt);
 		$options['height']    = $height;
 		$options['width']     = $width;
-		$options['itemId']    = $typeAlias . '.' . $itemId;
+		$options['itemId']    = $itemId;
+		$options['typeId']    = $typeId;
+		$options['typeAlias'] = $typeAlias;
 
 		$bar    = Toolbar::getInstance('toolbar');
 		$layout = new FileLayout('joomla.toolbar.versions');
 		$bar->appendButton('Custom', $layout->render($options), 'versions');
-	}
-
-	/**
-	 * Writes a save button for a given option, with an additional dropdown
-	 *
-	 * @param   array   $buttons  An array of buttons
-	 * @param   string  $class    The button class
-	 *
-	 * @return  void
-	 *
-	 * @since   4.0.0
-	 */
-	public static function saveGroup($buttons = array(), $class = 'btn-success')
-	{
-		$validOptions = array(
-			'apply'     => 'JTOOLBAR_APPLY',
-			'save'      => 'JTOOLBAR_SAVE',
-			'save2new'  => 'JTOOLBAR_SAVE_AND_NEW',
-			'save2copy' => 'JTOOLBAR_SAVE_AS_COPY'
-		);
-
-		$bar = Toolbar::getInstance('toolbar');
-
-		$saveGroup = $bar->dropdownButton('save-group');
-
-		$saveGroup->configure(
-			function (Toolbar $childBar) use ($buttons, $validOptions)
-			{
-				foreach ($buttons as $button)
-				{
-					if (!\array_key_exists($button[0], $validOptions))
-					{
-						continue;
-					}
-
-					$options['group'] = true;
-					$altText = $button[2] ?? $validOptions[$button[0]];
-
-					$childBar->{$button[0]}($button[1])
-						->text($altText);
-				}
-			}
-		);
 	}
 
 	/**
@@ -745,18 +644,16 @@ abstract class ToolbarHelper
 	 * @param   string  $targetModalId  ID of the target modal box
 	 * @param   string  $icon           Icon class to show on modal button
 	 * @param   string  $alt            Title for the modal button
-	 * @param   string  $class          The button class
 	 *
 	 * @return  void
 	 *
 	 * @since   3.2
 	 */
-	public static function modal($targetModalId, $icon, $alt, $class = 'btn-primary')
+	public static function modal($targetModalId, $icon, $alt)
 	{
 		$title = Text::_($alt);
-
-		$dhtml = '<joomla-toolbar-button><button data-bs-toggle="modal" data-bs-target="#' . $targetModalId . '" class="btn ' . $class . '">
-			<span class="' . $icon . ' icon-fw" title="' . $title . '"></span> ' . $title . '</button></joomla-toolbar-button>';
+		$dhtml = '<button data-toggle="modal" data-target="#' . $targetModalId . '" class="btn btn-small">
+			<span class="' . $icon . '" title="' . $title . '"></span> ' . $title . '</button>';
 
 		$bar = Toolbar::getInstance('toolbar');
 		$bar->appendButton('Custom', $dhtml, $alt);

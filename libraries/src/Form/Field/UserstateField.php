@@ -8,14 +8,18 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
+
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('predefinedlist');
 
 /**
  * Field to load a list of available users statuses
  *
  * @since  3.2
  */
-class UserstateField extends PredefinedlistField
+class UserstateField extends \JFormFieldPredefinedList
 {
 	/**
 	 * The form field type.

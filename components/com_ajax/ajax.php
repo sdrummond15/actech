@@ -9,13 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Log\Log;
-use Joomla\CMS\Plugin\PluginHelper;
-use Joomla\CMS\Response\JsonResponse;
-use Joomla\CMS\Table\Table;
-
 /*
  * References
  *  Support plugins in your component
@@ -26,7 +19,7 @@ use Joomla\CMS\Table\Table;
  */
 
 /** @var \Joomla\CMS\Application\CMSApplication $app */
-$app = Factory::getApplication();
+$app = JFactory::getApplication();
 $app->allowCache(false);
 
 // Prevent the api url from being indexed
@@ -36,7 +29,7 @@ $app->setHeader('X-Robots-Tag', 'noindex, nofollow');
 $input = $app->input;
 
 // Requested format passed via URL
-$format = strtolower($input->getWord('format', ''));
+$format = strtolower($input->getWord('format'));
 
 // Initialize default response and module name
 $results = null;
@@ -45,7 +38,7 @@ $parts   = null;
 // Check for valid format
 if (!$format)
 {
-	$results = new InvalidArgumentException(Text::_('COM_AJAX_SPECIFY_FORMAT'), 404);
+	$results = new InvalidArgumentException(JText::_('COM_AJAX_SPECIFY_FORMAT'), 404);
 }
 /*
  * Module support.
@@ -58,7 +51,7 @@ if (!$format)
 elseif ($input->get('module'))
 {
 	$module   = $input->get('module');
-	$table    = Table::getInstance('extension');
+	$table    = JTable::getInstance('extension');
 	$moduleId = $table->find(array('type' => 'module', 'element' => 'mod_' . $module));
 
 	if ($moduleId && $table->load($moduleId) && $table->enabled)
@@ -92,14 +85,7 @@ elseif ($input->get('module'))
 
 		$method = $input->get('method') ?: 'get';
 
-		$moduleInstance = $app->bootModule('mod_' . $module, $app->getName());
-
-		if ($moduleInstance instanceof \Joomla\CMS\Helper\HelperFactoryInterface && $helper = $moduleInstance->getHelper(substr($class, 3)))
-		{
-			$results = method_exists($helper, $method . 'Ajax') ? $helper->{$method . 'Ajax'}() : null;
-		}
-
-		if ($results === null && is_file($helperFile))
+		if (is_file($helperFile))
 		{
 			JLoader::register($class, $helperFile);
 
@@ -107,9 +93,9 @@ elseif ($input->get('module'))
 			{
 				// Load language file for module
 				$basePath = JPATH_BASE;
-				$lang     = Factory::getLanguage();
-				$lang->load('mod_' . $module, $basePath)
-				||  $lang->load('mod_' . $module, $basePath . '/modules/mod_' . $module);
+				$lang     = JFactory::getLanguage();
+				$lang->load('mod_' . $module, $basePath, null, false, true)
+				||  $lang->load('mod_' . $module, $basePath . '/modules/mod_' . $module, null, false, true);
 
 				try
 				{
@@ -123,19 +109,19 @@ elseif ($input->get('module'))
 			// Method does not exist
 			else
 			{
-				$results = new LogicException(Text::sprintf('COM_AJAX_METHOD_NOT_EXISTS', $method . 'Ajax'), 404);
+				$results = new LogicException(JText::sprintf('COM_AJAX_METHOD_NOT_EXISTS', $method . 'Ajax'), 404);
 			}
 		}
 		// The helper file does not exist
-		elseif ($results === null)
+		else
 		{
-			$results = new RuntimeException(Text::sprintf('COM_AJAX_FILE_NOT_EXISTS', 'mod_' . $module . '/helper.php'), 404);
+			$results = new RuntimeException(JText::sprintf('COM_AJAX_FILE_NOT_EXISTS', 'mod_' . $module . '/helper.php'), 404);
 		}
 	}
 	// Module is not published, you do not have access to it, or it is not assigned to the current menu item
 	else
 	{
-		$results = new LogicException(Text::sprintf('COM_AJAX_MODULE_NOT_ACCESSIBLE', 'mod_' . $module), 404);
+		$results = new LogicException(JText::sprintf('COM_AJAX_MODULE_NOT_ACCESSIBLE', 'mod_' . $module), 404);
 	}
 }
 /*
@@ -150,12 +136,13 @@ elseif ($input->get('module'))
 elseif ($input->get('plugin'))
 {
 	$group      = $input->get('group', 'ajax');
-	PluginHelper::importPlugin($group);
+	JPluginHelper::importPlugin($group);
 	$plugin     = ucfirst($input->get('plugin'));
+	$dispatcher = JEventDispatcher::getInstance();
 
 	try
 	{
-		$results = Factory::getApplication()->triggerEvent('onAjax' . $plugin);
+		$results = $dispatcher->trigger('onAjax' . $plugin);
 	}
 	catch (Exception $e)
 	{
@@ -173,7 +160,7 @@ elseif ($input->get('plugin'))
 elseif ($input->get('template'))
 {
 	$template   = $input->get('template');
-	$table      = Table::getInstance('extension');
+	$table      = JTable::getInstance('extension');
 	$templateId = $table->find(array('type' => 'template', 'element' => $template));
 
 	if ($templateId && $table->load($templateId) && $table->enabled)
@@ -215,9 +202,9 @@ elseif ($input->get('template'))
 			if (method_exists($class, $method . 'Ajax'))
 			{
 				// Load language file for template
-				$lang = Factory::getLanguage();
-				$lang->load('tpl_' . $template, $basePath)
-				||  $lang->load('tpl_' . $template, $basePath . '/templates/' . $template);
+				$lang = JFactory::getLanguage();
+				$lang->load('tpl_' . $template, $basePath, null, false, true)
+				||  $lang->load('tpl_' . $template, $basePath . '/templates/' . $template, null, false, true);
 
 				try
 				{
@@ -231,19 +218,19 @@ elseif ($input->get('template'))
 			// Method does not exist
 			else
 			{
-				$results = new LogicException(Text::sprintf('COM_AJAX_METHOD_NOT_EXISTS', $method . 'Ajax'), 404);
+				$results = new LogicException(JText::sprintf('COM_AJAX_METHOD_NOT_EXISTS', $method . 'Ajax'), 404);
 			}
 		}
 		// The helper file does not exist
 		else
 		{
-			$results = new RuntimeException(Text::sprintf('COM_AJAX_FILE_NOT_EXISTS', 'tpl_' . $template . '/helper.php'), 404);
+			$results = new RuntimeException(JText::sprintf('COM_AJAX_FILE_NOT_EXISTS', 'tpl_' . $template . '/helper.php'), 404);
 		}
 	}
 	// Template is not assigned to the current menu item
 	else
 	{
-		$results = new LogicException(Text::sprintf('COM_AJAX_TEMPLATE_NOT_ACCESSIBLE', 'tpl_' . $template), 404);
+		$results = new LogicException(JText::sprintf('COM_AJAX_TEMPLATE_NOT_ACCESSIBLE', 'tpl_' . $template), 404);
 	}
 }
 
@@ -251,18 +238,19 @@ elseif ($input->get('template'))
 switch ($format)
 {
 	// JSONinzed
-	case 'json':
-		echo new JsonResponse($results, null, false, $input->get('ignoreMessages', true, 'bool'));
+	case 'json' :
+
+		echo new JResponseJson($results, null, false, $input->get('ignoreMessages', true, 'bool'));
 
 		break;
 
 	// Handle as raw format
-	default:
+	default :
 		// Output exception
 		if ($results instanceof Exception)
 		{
 			// Log an error
-			Log::add($results->getMessage(), Log::ERROR);
+			JLog::add($results->getMessage(), JLog::ERROR);
 
 			// Set status header code
 			$app->setHeader('status', $results->getCode(), true);

@@ -8,10 +8,9 @@
 
 namespace Joomla\CMS\Form\Rule;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Date\Date;
-use Joomla\CMS\Factory;
 use Joomla\CMS\Form\Form;
 use Joomla\CMS\Form\FormRule;
 use Joomla\Registry\Registry;
@@ -41,21 +40,21 @@ class CalendarRule extends FormRule
 	public function test(\SimpleXMLElement $element, $value, $group = null, Registry $input = null, Form $form = null)
 	{
 		// If the field is empty and not required, the field is valid.
-		$required = ((string) $element['required'] === 'true' || (string) $element['required'] === 'required');
+		$required = ((string) $element['required'] == 'true' || (string) $element['required'] == 'required');
 
 		if (!$required && empty($value))
 		{
 			return true;
 		}
 
-		if (strtolower($value) === 'now')
+		if (strtolower($value) == 'now')
 		{
 			return true;
 		}
 
 		try
 		{
-			return Factory::getDate($value) instanceof Date;
+			return \JFactory::getDate($value) instanceof Date;
 		}
 		catch (\Exception $e)
 		{

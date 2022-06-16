@@ -14,39 +14,45 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Form\Form;
 use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Language\Text;
-use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Plugin\PluginHelper;
 use Joomla\CMS\User\User;
-use Joomla\Component\Actionlogs\Administrator\Helper\ActionlogsHelper;
-use Joomla\Database\Exception\ExecutionFailureException;
-use Joomla\Database\ParameterType;
 
 /**
  * Joomla! Users Actions Logging Plugin.
  *
  * @since  3.9.0
  */
-class PlgSystemActionLogs extends CMSPlugin
+class PlgSystemActionLogs extends JPlugin
 {
 	/**
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * Application object.
 	 *
+	 * @var    JApplicationCms
 	 * @since  3.9.0
 	 */
 	protected $app;
 
 	/**
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * Database object.
 	 *
+	 * @var    JDatabaseDriver
 	 * @since  3.9.0
 	 */
 	protected $db;
 
 	/**
+	 * Load plugin language file automatically so that it can be used inside component
+	 *
+	 * @var    boolean
+	 * @since  3.9.0
+	 */
+	protected $autoloadLanguage = true;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param   object  $subject  The object to observe.
-	 * @param   array   $config   An optional associative array of configuration settings.
+	 * @param   object  &$subject  The object to observe.
+	 * @param   array   $config    An optional associative array of configuration settings.
 	 *
 	 * @since   3.9.0
 	 */
@@ -59,47 +65,40 @@ class PlgSystemActionLogs extends CMSPlugin
 	}
 
 	/**
-	 * Listener for the `onAfterInitialise` event
-	 *
-	 * @return  void
-	 *
-	 * @since   4.0.0
-	 */
-	public function onAfterInitialise()
-	{
-		// Load plugin language files.
-		$this->loadLanguage();
-	}
-
-	/**
 	 * Adds additional fields to the user editing form for logs e-mail notifications
 	 *
-	 * @param   Form   $form  The form to be altered.
+	 * @param   JForm  $form  The form to be altered.
 	 * @param   mixed  $data  The associated data for the form.
 	 *
 	 * @return  boolean
 	 *
 	 * @since   3.9.0
-	 *
-	 * @throws  Exception
 	 */
-	public function onContentPrepareForm(Form $form, $data)
+	public function onContentPrepareForm($form, $data)
 	{
+		if (!$form instanceof Form)
+		{
+			$this->subject->setError('JERROR_NOT_A_FORM');
+
+			return false;
+		}
+
 		$formName = $form->getName();
 
-		$allowedFormNames = [
+		$allowedFormNames = array(
 			'com_users.profile',
+			'com_admin.profile',
 			'com_users.user',
-		];
+		);
 
-		if (!in_array($formName, $allowedFormNames, true))
+		if (!in_array($formName, $allowedFormNames))
 		{
 			return true;
 		}
 
 		/**
-		 * We only allow users who have Super User permission to change this setting for themselves or for other
-		 * users who have the same Super User permission
+		 * We only allow users who has Super User permission change this setting for himself or for other users
+		 * who has same Super User permission
 		 */
 
 		$user = Factory::getUser();
@@ -110,7 +109,7 @@ class PlgSystemActionLogs extends CMSPlugin
 		}
 
 		// If we are on the save command, no data is passed to $data variable, we need to get it directly from request
-		$jformData = $this->app->input->get('jform', [], 'array');
+		$jformData = $this->app->input->get('jform', array(), 'array');
 
 		if ($jformData && !$data)
 		{
@@ -142,8 +141,6 @@ class PlgSystemActionLogs extends CMSPlugin
 		}
 
 		$form->loadFile('actionlogs', false);
-
-		return true;
 	}
 
 	/**
@@ -158,7 +155,7 @@ class PlgSystemActionLogs extends CMSPlugin
 	 */
 	public function onContentPrepareData($context, $data)
 	{
-		if (!in_array($context, ['com_users.profile', 'com_users.user']))
+		if (!in_array($context, array('com_users.profile', 'com_admin.profile', 'com_users.user')))
 		{
 			return true;
 		}
@@ -173,20 +170,16 @@ class PlgSystemActionLogs extends CMSPlugin
 			return true;
 		}
 
-		$db = $this->db;
-		$id = (int) $data->id;
-
-		$query = $db->getQuery(true)
-			->select($db->quoteName(['notify', 'extensions']))
-			->from($db->quoteName('#__action_logs_users'))
-			->where($db->quoteName('user_id') . ' = :userid')
-			->bind(':userid', $id, ParameterType::INTEGER);
+		$query = $this->db->getQuery(true)
+			->select($this->db->quoteName(array('notify', 'extensions')))
+			->from($this->db->quoteName('#__action_logs_users'))
+			->where($this->db->quoteName('user_id') . ' = ' . (int) $data->id);
 
 		try
 		{
-			$values = $db->setQuery($query)->loadObject();
+			$values = $this->db->setQuery($query)->loadObject();
 		}
-		catch (ExecutionFailureException $e)
+		catch (JDatabaseExceptionExecuting $e)
 		{
 			return false;
 		}
@@ -196,7 +189,7 @@ class PlgSystemActionLogs extends CMSPlugin
 			return true;
 		}
 
-		$data->actionlogs                       = new stdClass;
+		$data->actionlogs                       = new StdClass;
 		$data->actionlogs->actionlogsNotify     = $values->notify;
 		$data->actionlogs->actionlogsExtensions = $values->extensions;
 
@@ -245,15 +238,13 @@ class PlgSystemActionLogs extends CMSPlugin
 		// Update last run status
 		$this->params->set('lastrun', $now);
 
-		$db     = $this->db;
-		$params = $this->params->toString('JSON');
-		$query  = $db->getQuery(true)
-			->update($db->quoteName('#__extensions'))
-			->set($db->quoteName('params') . ' = :params')
-			->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
-			->where($db->quoteName('folder') . ' = ' . $db->quote('system'))
-			->where($db->quoteName('element') . ' = ' . $db->quote('actionlogs'))
-			->bind(':params', $params);
+		$db    = $this->db;
+		$query = $db->getQuery(true)
+			->update($db->qn('#__extensions'))
+			->set($db->qn('params') . ' = ' . $db->q($this->params->toString('JSON')))
+			->where($db->qn('type') . ' = ' . $db->q('plugin'))
+			->where($db->qn('folder') . ' = ' . $db->q('system'))
+			->where($db->qn('element') . ' = ' . $db->q('actionlogs'));
 
 		try
 		{
@@ -271,7 +262,7 @@ class PlgSystemActionLogs extends CMSPlugin
 			// Update the plugin parameters
 			$result = $db->setQuery($query)->execute();
 
-			$this->clearCacheGroups(['com_plugins'], [0, 1]);
+			$this->clearCacheGroups(array('com_plugins'), array(0, 1));
 		}
 		catch (Exception $exc)
 		{
@@ -298,16 +289,14 @@ class PlgSystemActionLogs extends CMSPlugin
 		}
 
 		$daysToDeleteAfter = (int) $this->params->get('logDeletePeriod', 0);
-		$now               = Factory::getDate()->toSql();
+		$now = $db->quote(Factory::getDate()->toSql());
 
 		if ($daysToDeleteAfter > 0)
 		{
-			$days = -1 * $daysToDeleteAfter;
+			$conditions = array($db->quoteName('log_date') . ' < ' . $query->dateAdd($now, -1 * $daysToDeleteAfter, ' DAY'));
 
 			$query->clear()
-				->delete($db->quoteName('#__action_logs'))
-				->where($db->quoteName('log_date') . ' < ' . $query->dateAdd($db->quote($now), $days, 'DAY'));
-
+				->delete($db->quoteName('#__action_logs'))->where($conditions);
 			$db->setQuery($query);
 
 			try
@@ -323,41 +312,6 @@ class PlgSystemActionLogs extends CMSPlugin
 	}
 
 	/**
-	 * Clears cache groups. We use it to clear the plugins cache after we update the last run timestamp.
-	 *
-	 * @param   array  $clearGroups   The cache groups to clean
-	 * @param   array  $cacheClients  The cache clients (site, admin) to clean
-	 *
-	 * @return  void
-	 *
-	 * @since   3.9.0
-	 */
-	private function clearCacheGroups(array $clearGroups, array $cacheClients = [0, 1])
-	{
-		foreach ($clearGroups as $group)
-		{
-			foreach ($cacheClients as $clientId)
-			{
-				try
-				{
-					$options = [
-						'defaultgroup' => $group,
-						'cachebase'    => $clientId ? JPATH_ADMINISTRATOR . '/cache' :
-							Factory::getApplication()->get('cache_path', JPATH_SITE . '/cache'),
-					];
-
-					$cache = Cache::getInstance('callback', $options);
-					$cache->clean();
-				}
-				catch (Exception $e)
-				{
-					// Ignore it
-				}
-			}
-		}
-	}
-
-	/**
 	 * Utility method to act on a user after it has been saved.
 	 *
 	 * @param   array    $user     Holds the new user data.
@@ -365,104 +319,86 @@ class PlgSystemActionLogs extends CMSPlugin
 	 * @param   boolean  $success  True if user was successfully stored in the database.
 	 * @param   string   $msg      Message.
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.9.0
 	 */
-	public function onUserAfterSave($user, $isNew, $success, $msg): void
+	public function onUserAfterSave($user, $isNew, $success, $msg)
 	{
 		if (!$success)
 		{
-			return;
+			return false;
 		}
 
 		// Clear access rights in case user groups were changed.
 		$userObject = new User($user['id']);
 		$userObject->clearAccessRights();
-
 		$authorised = $userObject->authorise('core.admin');
-		$userid     = (int) $user['id'];
-		$db         = $this->db;
 
-		$query = $db->getQuery(true)
+		$query = $this->db->getQuery(true)
 			->select('COUNT(*)')
-			->from($db->quoteName('#__action_logs_users'))
-			->where($db->quoteName('user_id') . ' = :userid')
-			->bind(':userid', $userid, ParameterType::INTEGER);
+			->from($this->db->quoteName('#__action_logs_users'))
+			->where($this->db->quoteName('user_id') . ' = ' . (int) $user['id']);
 
 		try
 		{
-			$exists = (bool) $db->setQuery($query)->loadResult();
+			$exists = (bool) $this->db->setQuery($query)->loadResult();
 		}
-		catch (ExecutionFailureException $e)
+		catch (JDatabaseExceptionExecuting $e)
 		{
-			return;
+			return false;
 		}
-
-		$query->clear();
 
 		// If preferences don't exist, insert.
 		if (!$exists && $authorised && isset($user['actionlogs']))
 		{
-			$notify  = (int) $user['actionlogs']['actionlogsNotify'];
-			$values  = [':userid', ':notify'];
-			$bind    = [$userid, $notify];
-			$columns = ['user_id', 'notify'];
-
-			$query->bind($values, $bind, ParameterType::INTEGER);
+			$values  = array((int) $user['id'], (int) $user['actionlogs']['actionlogsNotify']);
+			$columns = array('user_id', 'notify');
 
 			if (isset($user['actionlogs']['actionlogsExtensions']))
 			{
-				$values[]  = ':extension';
+				$values[]  = $this->db->quote(json_encode($user['actionlogs']['actionlogsExtensions']));
 				$columns[] = 'extensions';
-				$extension = json_encode($user['actionlogs']['actionlogsExtensions']);
-				$query->bind(':extension', $extension);
 			}
 
-			$query->insert($db->quoteName('#__action_logs_users'))
-				->columns($db->quoteName($columns))
+			$query = $this->db->getQuery(true)
+				->insert($this->db->quoteName('#__action_logs_users'))
+				->columns($this->db->quoteName($columns))
 				->values(implode(',', $values));
 		}
 		elseif ($exists && $authorised && isset($user['actionlogs']))
 		{
 			// Update preferences.
-			$notify = (int) $user['actionlogs']['actionlogsNotify'];
-			$values = [$db->quoteName('notify') . ' = :notify'];
-
-			$query->bind(':notify', $notify, ParameterType::INTEGER);
+			$values = array($this->db->quoteName('notify') . ' = ' . (int) $user['actionlogs']['actionlogsNotify']);
 
 			if (isset($user['actionlogs']['actionlogsExtensions']))
 			{
-				$values[] = $db->quoteName('extensions') . ' = :extension';
-				$extension = json_encode($user['actionlogs']['actionlogsExtensions']);
-				$query->bind(':extension', $extension);
+				$values[] = $this->db->quoteName('extensions') . ' = ' . $this->db->quote(json_encode($user['actionlogs']['actionlogsExtensions']));
 			}
 
-			$query->update($db->quoteName('#__action_logs_users'))
+			$query = $this->db->getQuery(true)
+				->update($this->db->quoteName('#__action_logs_users'))
 				->set($values)
-				->where($db->quoteName('user_id') . ' = :userid')
-				->bind(':userid', $userid, ParameterType::INTEGER);
+				->where($this->db->quoteName('user_id') . ' = ' . (int) $user['id']);
 		}
 		elseif ($exists && !$authorised)
 		{
 			// Remove preferences if user is not authorised.
-			$query->delete($db->quoteName('#__action_logs_users'))
-				->where($db->quoteName('user_id') . ' = :userid')
-				->bind(':userid', $userid, ParameterType::INTEGER);
-		}
-		else
-		{
-			return;
+			$query = $this->db->getQuery(true)
+				->delete($this->db->quoteName('#__action_logs_users'))
+				->where($this->db->quoteName('user_id') . ' = ' . (int) $user['id']);
 		}
 
 		try
 		{
-			$db->setQuery($query)->execute();
+			$this->db->setQuery($query)->execute();
 		}
-		catch (ExecutionFailureException $e)
+		catch (JDatabaseExceptionExecuting $e)
 		{
-			// Do nothing.
+			return false;
 		}
+
+		return true;
 	}
 
 	/**
@@ -474,32 +410,67 @@ class PlgSystemActionLogs extends CMSPlugin
 	 * @param   boolean  $success  True if user was successfully stored in the database
 	 * @param   string   $msg      Message
 	 *
+	 * @return  boolean
+	 *
+	 * @since   3.9.0
+	 */
+	public function onUserAfterDelete($user, $success, $msg)
+	{
+		if (!$success)
+		{
+			return false;
+		}
+
+		$query = $this->db->getQuery(true)
+			->delete($this->db->quoteName('#__action_logs_users'))
+			->where($this->db->quoteName('user_id') . ' = ' . (int) $user['id']);
+
+		try
+		{
+			$this->db->setQuery($query)->execute();
+		}
+		catch (JDatabaseExceptionExecuting $e)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Clears cache groups. We use it to clear the plugins cache after we update the last run timestamp.
+	 *
+	 * @param   array  $clearGroups   The cache groups to clean
+	 * @param   array  $cacheClients  The cache clients (site, admin) to clean
+	 *
 	 * @return  void
 	 *
 	 * @since   3.9.0
 	 */
-	public function onUserAfterDelete($user, $success, $msg): void
+	private function clearCacheGroups(array $clearGroups, array $cacheClients = array(0, 1))
 	{
-		if (!$success)
-		{
-			return;
-		}
+		$conf = Factory::getConfig();
 
-		$db     = $this->db;
-		$userid = (int) $user['id'];
-
-		$query = $db->getQuery(true)
-			->delete($db->quoteName('#__action_logs_users'))
-			->where($db->quoteName('user_id') . ' = :userid')
-			->bind(':userid', $userid, ParameterType::INTEGER);
-
-		try
+		foreach ($clearGroups as $group)
 		{
-			$db->setQuery($query)->execute();
-		}
-		catch (ExecutionFailureException $e)
-		{
-			// Do nothing.
+			foreach ($cacheClients as $clientId)
+			{
+				try
+				{
+					$options = array(
+						'defaultgroup' => $group,
+						'cachebase'    => $clientId ? JPATH_ADMINISTRATOR . '/cache' :
+							$conf->get('cache_path', JPATH_SITE . '/cache')
+					);
+
+					$cache = Cache::getInstance('callback', $options);
+					$cache->clean();
+				}
+				catch (Exception $e)
+				{
+					// Ignore it
+				}
+			}
 		}
 	}
 

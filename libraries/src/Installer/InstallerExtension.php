@@ -8,19 +8,16 @@
 
 namespace Joomla\CMS\Installer;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Log\Log;
-use Joomla\CMS\Object\CMSObject;
 
 /**
  * Extension object
  *
  * @since  3.1
  */
-class InstallerExtension extends CMSObject
+class InstallerExtension extends \JObject
 {
 	/**
 	 * Filename of the extension
@@ -88,14 +85,6 @@ class InstallerExtension extends CMSObject
 	public $params = null;
 
 	/**
-	 * The namespace of the extension
-	 *
-	 * @var    string
-	 * @since  4.0.0
-	 */
-	public $namespace = null;
-
-	/**
 	 * Constructor
 	 *
 	 * @param   \SimpleXMLElement  $element  A SimpleXMLElement from which to load data from
@@ -123,7 +112,7 @@ class InstallerExtension extends CMSObject
 
 					if ($tmp_client_id == null)
 					{
-						Log::add(Text::_('JLIB_INSTALLER_ERROR_EXTENSION_INVALID_CLIENT_IDENTIFIER'), Log::WARNING, 'jerror');
+						\JLog::add(\JText::_('JLIB_INSTALLER_ERROR_EXTENSION_INVALID_CLIENT_IDENTIFIER'), \JLog::WARNING, 'jerror');
 					}
 					else
 					{

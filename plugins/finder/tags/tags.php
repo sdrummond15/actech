@@ -9,22 +9,16 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Table\Table;
-use Joomla\Component\Finder\Administrator\Indexer\Adapter;
-use Joomla\Component\Finder\Administrator\Indexer\Helper;
-use Joomla\Component\Finder\Administrator\Indexer\Indexer;
-use Joomla\Component\Finder\Administrator\Indexer\Result;
-use Joomla\Component\Tags\Site\Helper\RouteHelper;
-use Joomla\Database\DatabaseQuery;
 use Joomla\Registry\Registry;
+
+JLoader::register('FinderIndexerAdapter', JPATH_ADMINISTRATOR . '/components/com_finder/helpers/indexer/adapter.php');
 
 /**
  * Finder adapter for Joomla Tag.
  *
  * @since  3.1
  */
-class PlgFinderTags extends Adapter
+class PlgFinderTags extends FinderIndexerAdapter
 {
 	/**
 	 * The plugin identifier.
@@ -86,14 +80,14 @@ class PlgFinderTags extends Adapter
 	 * Method to remove the link information for items that have been deleted.
 	 *
 	 * @param   string  $context  The context of the action being performed.
-	 * @param   Table   $table    A Table object containing the record to be deleted
+	 * @param   JTable  $table    A JTable object containing the record to be deleted
 	 *
-	 * @return  void
+	 * @return  boolean  True on success.
 	 *
 	 * @since   3.1
 	 * @throws  Exception on database error.
 	 */
-	public function onFinderAfterDelete($context, $table): void
+	public function onFinderAfterDelete($context, $table)
 	{
 		if ($context === 'com_tags.tag')
 		{
@@ -105,26 +99,26 @@ class PlgFinderTags extends Adapter
 		}
 		else
 		{
-			return;
+			return true;
 		}
 
 		// Remove the items.
-		$this->remove($id);
+		return $this->remove($id);
 	}
 
 	/**
 	 * Method to determine if the access level of an item changed.
 	 *
 	 * @param   string   $context  The context of the content passed to the plugin.
-	 * @param   Table    $row      A Table object
+	 * @param   JTable   $row      A JTable object
 	 * @param   boolean  $isNew    If the content has just been created
 	 *
-	 * @return  void
+	 * @return  boolean  True on success.
 	 *
 	 * @since   3.1
 	 * @throws  Exception on database error.
 	 */
-	public function onFinderAfterSave($context, $row, $isNew): void
+	public function onFinderAfterSave($context, $row, $isNew)
 	{
 		// We only want to handle tags here.
 		if ($context === 'com_tags.tag')
@@ -139,6 +133,8 @@ class PlgFinderTags extends Adapter
 			// Reindex the item
 			$this->reindex($row->id);
 		}
+
+		return true;
 	}
 
 	/**
@@ -147,7 +143,7 @@ class PlgFinderTags extends Adapter
 	 * to queue the item to be indexed later.
 	 *
 	 * @param   string   $context  The context of the content passed to the plugin.
-	 * @param   Table    $row      A Table object
+	 * @param   JTable   $row      A JTable object
 	 * @param   boolean  $isNew    If the content is just about to be created
 	 *
 	 * @return  boolean  True on success.
@@ -199,19 +195,20 @@ class PlgFinderTags extends Adapter
 	}
 
 	/**
-	 * Method to index an item. The item must be a Result object.
+	 * Method to index an item. The item must be a FinderIndexerResult object.
 	 *
-	 * @param   Result  $item  The item to index as a Result object.
+	 * @param   FinderIndexerResult  $item    The item to index as a FinderIndexerResult object.
+	 * @param   string               $format  The item format
 	 *
 	 * @return  void
 	 *
 	 * @since   3.1
 	 * @throws  Exception on database error.
 	 */
-	protected function index(Result $item)
+	protected function index(FinderIndexerResult $item, $format = 'html')
 	{
 		// Check if the extension is enabled
-		if (ComponentHelper::isEnabled($this->extension) === false)
+		if (JComponentHelper::isEnabled($this->extension) === false)
 		{
 			return;
 		}
@@ -220,16 +217,15 @@ class PlgFinderTags extends Adapter
 
 		// Initialize the item parameters.
 		$registry = new Registry($item->params);
-		$item->params = clone ComponentHelper::getParams('com_tags', true);
+		$item->params = clone JComponentHelper::getParams('com_tags', true);
 		$item->params->merge($registry);
 
 		$item->metadata = new Registry($item->metadata);
 
-		// Create a URL as identifier to recognise items again.
-		$item->url = $this->getUrl($item->id, $this->extension, $this->layout);
-
 		// Build the necessary route and path information.
-		$item->route = RouteHelper::getTagRoute($item->slug);
+		$item->url = $this->getUrl($item->id, $this->extension, $this->layout);
+		$item->route = TagsHelperRoute::getTagRoute($item->slug);
+		$item->path = FinderIndexerHelper::getContentPath($item->route);
 
 		// Get the menu title if it exists.
 		$title = $this->getItemMenuTitle($item->url);
@@ -244,12 +240,12 @@ class PlgFinderTags extends Adapter
 		$item->metaauthor = $item->metadata->get('author');
 
 		// Handle the link to the metadata.
-		$item->addInstruction(Indexer::META_CONTEXT, 'link');
-		$item->addInstruction(Indexer::META_CONTEXT, 'metakey');
-		$item->addInstruction(Indexer::META_CONTEXT, 'metadesc');
-		$item->addInstruction(Indexer::META_CONTEXT, 'metaauthor');
-		$item->addInstruction(Indexer::META_CONTEXT, 'author');
-		$item->addInstruction(Indexer::META_CONTEXT, 'created_by_alias');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'link');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metakey');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metadesc');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metaauthor');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'author');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'created_by_alias');
 
 		// Add the type taxonomy data.
 		$item->addTaxonomy('Type', 'Tag');
@@ -264,7 +260,7 @@ class PlgFinderTags extends Adapter
 		$item->addTaxonomy('Language', $item->language);
 
 		// Get content extras.
-		Helper::getContentExtras($item);
+		FinderIndexerHelper::getContentExtras($item);
 
 		// Index the item.
 		$this->indexer->index($item);
@@ -279,24 +275,27 @@ class PlgFinderTags extends Adapter
 	 */
 	protected function setup()
 	{
+		// Load dependent classes.
+		JLoader::register('TagsHelperRoute', JPATH_SITE . '/components/com_tags/helpers/route.php');
+
 		return true;
 	}
 
 	/**
 	 * Method to get the SQL query used to retrieve the list of content items.
 	 *
-	 * @param   mixed  $query  A DatabaseQuery object or null.
+	 * @param   mixed  $query  A JDatabaseQuery object or null.
 	 *
-	 * @return  DatabaseQuery  A database object.
+	 * @return  JDatabaseQuery  A database object.
 	 *
 	 * @since   3.1
 	 */
 	protected function getListQuery($query = null)
 	{
-		$db = $this->db;
+		$db = JFactory::getDbo();
 
 		// Check if we can use the supplied SQL query.
-		$query = $query instanceof DatabaseQuery ? $query : $db->getQuery(true)
+		$query = $query instanceof JDatabaseQuery ? $query : $db->getQuery(true)
 			->select('a.id, a.title, a.alias, a.description AS summary')
 			->select('a.created_time AS start_date, a.created_user_id AS created_by')
 			->select('a.metakey, a.metadesc, a.metadata, a.language, a.access')
@@ -327,7 +326,7 @@ class PlgFinderTags extends Adapter
 	/**
 	 * Method to get a SQL query to load the published and access states for the given tag.
 	 *
-	 * @return  DatabaseQuery  A database object.
+	 * @return  JDatabaseQuery  A database object.
 	 *
 	 * @since   3.1
 	 */
@@ -347,7 +346,7 @@ class PlgFinderTags extends Adapter
 	 *
 	 * @param   string  $time  The modified timestamp.
 	 *
-	 * @return  DatabaseQuery  A database object.
+	 * @return  JDatabaseQuery  A database object.
 	 *
 	 * @since   3.1
 	 */

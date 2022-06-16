@@ -9,16 +9,13 @@
 
 defined('_JEXEC') or die();
 
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\Component\Fields\Administrator\Helper\FieldsHelper;
-
 /**
  * Plug-in to show a custom field in eg an article
  * This uses the {fields ID} syntax
  *
  * @since  3.7.0
  */
-class PlgContentFields extends CMSPlugin
+class PlgContentFields extends JPlugin
 {
 	/**
 	 * Plugin that shows a custom field
@@ -35,11 +32,11 @@ class PlgContentFields extends CMSPlugin
 	public function onContentPrepare($context, &$item, &$params, $page = 0)
 	{
 		// If the item has a context, overwrite the existing one
-		if ($context === 'com_finder.indexer' && !empty($item->context))
+		if ($context == 'com_finder.indexer' && !empty($item->context))
 		{
 			$context = $item->context;
 		}
-		elseif ($context === 'com_finder.indexer')
+		elseif ($context == 'com_finder.indexer')
 		{
 			// Don't run this plugin when the content is being indexed and we have no real context
 			return;
@@ -56,6 +53,9 @@ class PlgContentFields extends CMSPlugin
 		{
 			return;
 		}
+
+		// Register FieldsHelper
+		JLoader::register('FieldsHelper', JPATH_ADMINISTRATOR . '/components/com_fields/helpers/fields.php');
 
 		// Prepare the text
 		if (isset($item->text))
@@ -118,7 +118,7 @@ class PlgContentFields extends CMSPlugin
 			$id      = (int) $explode[0];
 			$output  = '';
 
-			if ($match[1] === 'field' && $id)
+			if ($match[1] == 'field' && $id)
 			{
 				if (isset($fieldsById[$id]))
 				{
@@ -129,7 +129,7 @@ class PlgContentFields extends CMSPlugin
 						array(
 							'item'    => $item,
 							'context' => $context,
-							'field'   => $fieldsById[$id],
+							'field'   => $fieldsById[$id]
 						)
 					);
 				}
@@ -143,7 +143,7 @@ class PlgContentFields extends CMSPlugin
 				}
 				else
 				{
-					$renderFields = $groups[$id] ?? '';
+					$renderFields = isset($groups[$id]) ? $groups[$id] : '';
 				}
 
 				if ($renderFields)
@@ -155,7 +155,7 @@ class PlgContentFields extends CMSPlugin
 						array(
 							'item'    => $item,
 							'context' => $context,
-							'fields'  => $renderFields,
+							'fields'  => $renderFields
 						)
 					);
 				}

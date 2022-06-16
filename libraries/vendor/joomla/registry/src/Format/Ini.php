@@ -2,21 +2,22 @@
 /**
  * Part of the Joomla Framework Registry Package
  *
- * @copyright  Copyright (C) 2005 - 2021 Open Source Matters, Inc. All rights reserved.
+ * @copyright  Copyright (C) 2005 - 2022 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
 
 namespace Joomla\Registry\Format;
 
-use Joomla\Registry\FormatInterface;
+use Joomla\Registry\AbstractRegistryFormat;
 use Joomla\Utilities\ArrayHelper;
+use stdClass;
 
 /**
  * INI format handler for Registry.
  *
  * @since  1.0
  */
-class Ini implements FormatInterface
+class Ini extends AbstractRegistryFormat
 {
 	/**
 	 * Default options array
@@ -24,11 +25,11 @@ class Ini implements FormatInterface
 	 * @var    array
 	 * @since  1.3.0
 	 */
-	protected static $options = [
+	protected static $options = array(
 		'supportArrayValues' => false,
 		'parseBooleanWords'  => false,
 		'processSections'    => false,
-	];
+	);
 
 	/**
 	 * A cache used by stringToObject.
@@ -36,7 +37,7 @@ class Ini implements FormatInterface
 	 * @var    array
 	 * @since  1.0
 	 */
-	protected static $cache = [];
+	protected static $cache = array();
 
 	/**
 	 * Converts an object into an INI formatted string
@@ -51,13 +52,13 @@ class Ini implements FormatInterface
 	 *
 	 * @since   1.0
 	 */
-	public function objectToString($object, array $options = [])
+	public function objectToString($object, $options = array())
 	{
-		$options            = array_merge(static::$options, $options);
+		$options            = array_merge(self::$options, $options);
 		$supportArrayValues = $options['supportArrayValues'];
 
-		$local  = [];
-		$global = [];
+		$local  = array();
+		$global = array();
 
 		$variables = get_object_vars($object);
 
@@ -137,25 +138,25 @@ class Ini implements FormatInterface
 	 *
 	 * @since   1.0
 	 */
-	public function stringToObject($data, array $options = [])
+	public function stringToObject($data, array $options = array())
 	{
-		$options = array_merge(static::$options, $options);
+		$options = array_merge(self::$options, $options);
 
 		// Check the memory cache for already processed strings.
 		$hash = md5($data . ':' . (int) $options['processSections']);
 
-		if (isset(static::$cache[$hash]))
+		if (isset(self::$cache[$hash]))
 		{
-			return static::$cache[$hash];
+			return self::$cache[$hash];
 		}
 
 		// If no lines present just return the object.
 		if (empty($data))
 		{
-			return new \stdClass;
+			return new stdClass;
 		}
 
-		$obj     = new \stdClass;
+		$obj     = new stdClass;
 		$section = false;
 		$array   = false;
 		$lines   = explode("\n", $data);
@@ -180,7 +181,7 @@ class Ini implements FormatInterface
 				if ($line[0] === '[' && ($line[$length - 1] === ']'))
 				{
 					$section       = substr($line, 1, $length - 2);
-					$obj->$section = new \stdClass;
+					$obj->$section = new stdClass;
 
 					continue;
 				}
@@ -253,7 +254,7 @@ class Ini implements FormatInterface
 					// If the value is 'true' assume boolean true.
 					$value = true;
 				}
-				elseif ($options['parseBooleanWords'] && \in_array(strtolower($value), ['yes', 'no'], true))
+				elseif ($options['parseBooleanWords'] && \in_array(strtolower($value), array('yes', 'no'), true))
 				{
 					// If the value is 'yes' or 'no' and option is enabled assume appropriate boolean
 					$value = (strtolower($value) === 'yes');
@@ -280,7 +281,7 @@ class Ini implements FormatInterface
 				{
 					if (!isset($obj->$section->$key))
 					{
-						$obj->$section->$key = [];
+						$obj->$section->$key = array();
 					}
 
 					if (!empty($arrayKey))
@@ -303,7 +304,7 @@ class Ini implements FormatInterface
 				{
 					if (!isset($obj->$key))
 					{
-						$obj->$key = [];
+						$obj->$key = array();
 					}
 
 					if (!empty($arrayKey))
@@ -325,7 +326,7 @@ class Ini implements FormatInterface
 		}
 
 		// Cache the string to save cpu cycles -- thus the world :)
-		static::$cache[$hash] = clone $obj;
+		self::$cache[$hash] = clone $obj;
 
 		return $obj;
 	}
@@ -358,7 +359,7 @@ class Ini implements FormatInterface
 
 			case 'string':
 				// Sanitize any CRLF characters..
-				$string = '"' . str_replace(["\r\n", "\n"], '\\n', $value) . '"';
+				$string = '"' . str_replace(array("\r\n", "\n"), '\\n', $value) . '"';
 
 				break;
 		}

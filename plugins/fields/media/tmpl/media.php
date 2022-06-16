@@ -8,22 +8,32 @@
  */
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Layout\LayoutHelper;
-
-if (empty($field->value) || empty($field->value['imagefile']))
+if ($field->value == '')
 {
 	return;
 }
 
-$class   = $fieldParams->get('image_class');
-$options = [
-	'src' => $field->value['imagefile'],
-	'alt' => empty($field->value['alt_text']) && empty($field->value['alt_empty']) ? false : $field->value['alt_text'],
-];
+$class = $fieldParams->get('image_class');
 
 if ($class)
 {
-	$options['class'] = $class;
+	$class = ' class="' . htmlentities($class, ENT_COMPAT, 'UTF-8', true) . '"';
 }
 
-echo LayoutHelper::render('joomla.html.image', $options);
+$value  = (array) $field->value;
+$buffer = '';
+
+foreach ($value as $path)
+{
+	if (!$path)
+	{
+		continue;
+	}
+
+	$buffer .= sprintf('<img src="%s"%s>',
+		htmlentities($path, ENT_COMPAT, 'UTF-8', true),
+		$class
+	);
+}
+
+echo $buffer;

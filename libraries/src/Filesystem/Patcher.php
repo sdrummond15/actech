@@ -8,8 +8,9 @@
 
 namespace Joomla\CMS\Filesystem;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Log\Log;
 use Joomla\CMS\Language\Text;
 
 /**
@@ -84,7 +85,7 @@ class Patcher
 	/**
 	 * Method to get a patcher
 	 *
-	 * @return  Patcher  an instance of the patcher
+	 * @return  FilesystemPatcher  an instance of the patcher
 	 *
 	 * @since   3.0.0
 	 */
@@ -99,9 +100,9 @@ class Patcher
 	}
 
 	/**
-	 * Reset the patcher
+	 * Reset the pacher
 	 *
-	 * @return  Patcher  This object for chaining
+	 * @return  FilesystemPatcher  This object for chaining
 	 *
 	 * @since   3.0.0
 	 */
@@ -136,7 +137,6 @@ class Patcher
 				$done = false;
 
 				$regex = '#^([^/]*/)*#';
-
 				if ($patch['strip'] !== null)
 				{
 					$regex = '#^([^/]*/){' . (int) $patch['strip'] . '}#';
@@ -210,11 +210,11 @@ class Patcher
 	/**
 	 * Add a unified diff file to the patcher
 	 *
-	 * @param   string   $filename  Path to the unified diff file
-	 * @param   string   $root      The files root path
-	 * @param   integer  $strip     The number of '/' to strip
+	 * @param   string  $filename  Path to the unified diff file
+	 * @param   string  $root      The files root path
+	 * @param   string  $strip     The number of '/' to strip
 	 *
-	 * @return  Patcher  $this for chaining
+	 * @return	FilesystemPatcher  $this for chaining
 	 *
 	 * @since   3.0.0
 	 */
@@ -226,11 +226,11 @@ class Patcher
 	/**
 	 * Add a unified diff string to the patcher
 	 *
-	 * @param   string   $udiff  Unified diff input string
-	 * @param   string   $root   The files root path
-	 * @param   integer  $strip  The number of '/' to strip
+	 * @param   string  $udiff  Unified diff input string
+	 * @param   string  $root   The files root path
+	 * @param   string  $strip  The number of '/' to strip
 	 *
-	 * @return  Patcher  $this for chaining
+	 * @return	FilesystemPatcher  $this for chaining
 	 *
 	 * @since   3.0.0
 	 */
@@ -264,9 +264,9 @@ class Patcher
 	 *
 	 * The internal array pointer of $lines is on the next line after the finding
 	 *
-	 * @param   array   $lines  The udiff array of lines
-	 * @param   string  $src    The source file
-	 * @param   string  $dst    The destination file
+	 * @param   array   &$lines  The udiff array of lines
+	 * @param   string  &$src    The source file
+	 * @param   string  &$dst    The destination file
 	 *
 	 * @return  boolean  TRUE in case of success, FALSE in case of failure
 	 *
@@ -324,11 +324,11 @@ class Patcher
 	 *
 	 * The internal array pointer of $lines is on the next line after the finding
 	 *
-	 * @param   array   $lines    The udiff array of lines
-	 * @param   string  $srcLine  The beginning of the patch for the source file
-	 * @param   string  $srcSize  The size of the patch for the source file
-	 * @param   string  $dstLine  The beginning of the patch for the destination file
-	 * @param   string  $dstSize  The size of the patch for the destination file
+	 * @param   array   &$lines    The udiff array of lines
+	 * @param   string  &$srcLine  The beginning of the patch for the source file
+	 * @param   string  &$srcSize  The size of the patch for the source file
+	 * @param   string  &$dstLine  The beginning of the patch for the destination file
+	 * @param   string  &$dstSize  The size of the patch for the destination file
 	 *
 	 * @return  boolean  TRUE in case of success, false in case of failure
 	 *
@@ -344,7 +344,6 @@ class Patcher
 			$srcLine = (int) $m[1];
 
 			$srcSize = 1;
-
 			if ($m[3] !== '')
 			{
 				$srcSize = (int) $m[3];
@@ -353,7 +352,6 @@ class Patcher
 			$dstLine = (int) $m[4];
 
 			$dstSize = 1;
-
 			if ($m[6] !== '')
 			{
 				$dstSize = (int) $m[6];
@@ -373,7 +371,7 @@ class Patcher
 	/**
 	 * Apply the patch
 	 *
-	 * @param   array   $lines    The udiff array of lines
+	 * @param   array   &$lines   The udiff array of lines
 	 * @param   string  $src      The source file
 	 * @param   string  $dst      The destination file
 	 * @param   string  $srcLine  The beginning of the patch for the source file
@@ -449,7 +447,7 @@ class Patcher
 					{
 						throw new \RuntimeException(
 							Text::sprintf(
-								'JLIB_FILESYSTEM_PATCHER_UNEXISTING_SOURCE',
+								'JLIB_FILESYSTEM_PATCHER_UNEXISING_SOURCE',
 								Path::removeRoot($src)
 							)
 						);
@@ -461,7 +459,7 @@ class Patcher
 					if ($srcSize > 0)
 					{
 						$dst_lines = & $this->getDestination($dst, $src);
-						$src_bottom = $srcLine + \count($source);
+						$src_bottom = $srcLine + count($source);
 
 						for ($l = $srcLine;$l < $src_bottom;$l++)
 						{
@@ -477,7 +475,7 @@ class Patcher
 							}
 						}
 
-						array_splice($dst_lines, $dstLine, \count($source), $destin);
+						array_splice($dst_lines, $dstLine, count($source), $destin);
 					}
 					else
 					{
@@ -515,7 +513,6 @@ class Patcher
 		if (!isset($this->sources[$src]))
 		{
 			$this->sources[$src] = null;
-
 			if (is_readable($src))
 			{
 				$this->sources[$src] = self::splitLines(file_get_contents($src));

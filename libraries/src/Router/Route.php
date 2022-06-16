@@ -8,10 +8,10 @@
 
 namespace Joomla\CMS\Router;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Log\Log;
 use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
 use Joomla\CMS\Uri\Uri;
 
 /**
@@ -72,9 +72,10 @@ class Route
 			// @deprecated  4.0 Before 3.9.7 this method silently converted $tls to integer
 			if (!is_int($tls))
 			{
-				@trigger_error(
+				Log::add(
 					__METHOD__ . '() called with incompatible variable type on parameter $tls.',
-					E_USER_DEPRECATED
+					Log::WARNING,
+					'deprecated'
 				);
 
 				$tls = (int) $tls;
@@ -100,7 +101,7 @@ class Route
 
 	/**
 	 * Translates an internal Joomla URL to a humanly readable URL.
-	 * NOTE: To build link for active client instead of a specific client, you can use <var>Route::_()</var>
+	 * NOTE: To build link for active client instead of a specific client, you can use <var>JRoute::_()</var>
 	 *
 	 * @param   string   $client    The client name for which to build the link.
 	 * @param   string   $url       Absolute or Relative URI to Joomla resource.
@@ -120,7 +121,7 @@ class Route
 	public static function link($client, $url, $xhtml = true, $tls = self::TLS_IGNORE, $absolute = false)
 	{
 		// If we cannot process this $url exit early.
-		if (!\is_array($url) && (strpos($url, '&') !== 0) && (strpos($url, 'index.php') !== 0))
+		if (!is_array($url) && (strpos($url, '&') !== 0) && (strpos($url, 'index.php') !== 0))
 		{
 			return $url;
 		}
@@ -136,7 +137,7 @@ class Route
 		// Make sure that we have our router
 		if (!isset(self::$_router[$client]))
 		{
-			throw new \RuntimeException(Text::sprintf('JLIB_APPLICATION_ERROR_ROUTER_LOAD', $client), 500);
+			throw new \RuntimeException(\JText::sprintf('JLIB_APPLICATION_ERROR_ROUTER_LOAD', $client), 500);
 		}
 
 		// Build route.
@@ -164,7 +165,7 @@ class Route
 		{
 			static $scheme_host_port;
 
-			if (!\is_array($scheme_host_port))
+			if (!is_array($scheme_host_port))
 			{
 				$uri2             = Uri::getInstance();
 				$scheme_host_port = array($uri2->getScheme(), $uri2->getHost(), $uri2->getPort());

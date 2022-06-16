@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Router;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Uri\Uri;
 
@@ -22,15 +22,13 @@ class AdministratorRouter extends Router
 	/**
 	 * Function to convert a route to an internal URI.
 	 *
-	 * @param   Uri   &$uri     The uri.
-	 * @param   bool  $setVars  Set the parsed data in the internal
-	 *                          storage for current-request-URLs
+	 * @param   Uri  &$uri  The uri.
 	 *
 	 * @return  array
 	 *
 	 * @since   1.5
 	 */
-	public function parse(&$uri, $setVars = false)
+	public function parse(&$uri)
 	{
 		return array();
 	}

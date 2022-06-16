@@ -12,8 +12,8 @@ defined('_JEXEC') or die;
 use Joomla\CMS\Form\Form;
 use Joomla\CMS\Form\FormHelper;
 use Joomla\CMS\Language\Text;
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
 use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\Component\Actionlogs\Administrator\Model\ActionlogModel;
 use Joomla\Utilities\ArrayHelper;
 
 /**
@@ -27,37 +27,60 @@ class PlgUserTerms extends CMSPlugin
 	 * Load the language file on instantiation.
 	 *
 	 * @var    boolean
-	 *
 	 * @since  3.9.0
 	 */
 	protected $autoloadLanguage = true;
 
 	/**
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * Application object.
 	 *
+	 * @var    JApplicationCms
 	 * @since  3.9.0
 	 */
 	protected $app;
 
 	/**
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * Database object.
 	 *
+	 * @var    JDatabaseDriver
 	 * @since  3.9.0
 	 */
 	protected $db;
 
 	/**
+	 * Constructor
+	 *
+	 * @param   object  &$subject  The object to observe
+	 * @param   array   $config    An array that holds the plugin configuration
+	 *
+	 * @since   3.9.0
+	 */
+	public function __construct(&$subject, $config)
+	{
+		parent::__construct($subject, $config);
+
+		FormHelper::addFieldPath(__DIR__ . '/field');
+	}
+
+	/**
 	 * Adds additional fields to the user registration form
 	 *
-	 * @param   Form   $form  The form to be altered.
+	 * @param   JForm  $form  The form to be altered.
 	 * @param   mixed  $data  The associated data for the form.
 	 *
 	 * @return  boolean
 	 *
 	 * @since   3.9.0
 	 */
-	public function onContentPrepareForm(Form $form, $data)
+	public function onContentPrepareForm($form, $data)
 	{
+		if (!($form instanceof JForm))
+		{
+			$this->_subject->setError('JERROR_NOT_A_FORM');
+
+			return false;
+		}
+
 		// Check we are manipulating a valid form - we only display this on user registration form.
 		$name = $form->getName();
 
@@ -67,8 +90,7 @@ class PlgUserTerms extends CMSPlugin
 		}
 
 		// Add the terms and conditions fields to the form.
-		FormHelper::addFieldPrefix('Joomla\\Plugin\\User\\Terms\\Field');
-		FormHelper::addFormPath(__DIR__ . '/forms');
+		Form::addFormPath(__DIR__ . '/terms');
 		$form->loadFile('terms');
 
 		$termsarticle = $this->params->get('terms_article');
@@ -108,11 +130,11 @@ class PlgUserTerms extends CMSPlugin
 		}
 
 		// Check that the terms is checked if required ie only in registration from frontend.
-		$option = $this->app->input->get('option');
-		$task   = $this->app->input->post->get('task');
-		$form   = $this->app->input->post->get('jform', [], 'array');
+		$option = $this->app->input->getCmd('option');
+		$task   = $this->app->input->get->getCmd('task');
+		$form   = $this->app->input->post->get('jform', array(), 'array');
 
-		if ($option == 'com_users' && in_array($task, ['registration.register']) && empty($form['terms']['terms']))
+		if ($option == 'com_users' && in_array($task, array('registration.register')) && empty($form['terms']['terms']))
 		{
 			throw new InvalidArgumentException(Text::_('PLG_USER_TERMS_FIELD_ERROR'));
 		}
@@ -128,20 +150,21 @@ class PlgUserTerms extends CMSPlugin
 	 * @param   boolean  $result  true if saving the user worked
 	 * @param   string   $error   error message
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.9.0
 	 */
-	public function onUserAfterSave($data, $isNew, $result, $error): void
+	public function onUserAfterSave($data, $isNew, $result, $error)
 	{
 		if (!$isNew || !$result)
 		{
-			return;
+			return true;
 		}
 
+		JLoader::register('ActionlogsModelActionlog', JPATH_ADMINISTRATOR . '/components/com_actionlogs/models/actionlog.php');
 		$userId = ArrayHelper::getValue($data, 'id', 0, 'int');
 
-		$message = [
+		$message = array(
 			'action'      => 'consent',
 			'id'          => $userId,
 			'title'       => $data['name'],
@@ -149,14 +172,10 @@ class PlgUserTerms extends CMSPlugin
 			'userid'      => $userId,
 			'username'    => $data['username'],
 			'accountlink' => 'index.php?option=com_users&task=user.edit&id=' . $userId,
-		];
+		);
 
-		/** @var ActionlogModel $model */
-		$model = $this->app
-			->bootComponent('com_actionlogs')
-			->getMVCFactory()
-			->createModel('Actionlog', 'Administrator');
-
-		$model->addLog([$message], 'PLG_USER_TERMS_LOGGING_CONSENT_TO_TERMS', 'plg_user_terms', $userId);
+		/* @var ActionlogsModelActionlog $model */
+		$model = BaseDatabaseModel::getInstance('Actionlog', 'ActionlogsModel');
+		$model->addLog(array($message), 'PLG_USER_TERMS_LOGGING_CONSENT_TO_TERMS', 'plg_user_terms', $userId);
 	}
 }

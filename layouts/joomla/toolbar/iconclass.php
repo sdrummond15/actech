@@ -9,8 +9,5 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Layout\LayoutHelper;
-
-$displayData['html'] = false;
-
-echo LayoutHelper::render('joomla.icon.iconclass', $displayData);
+?>
+icon-<?php echo $displayData['icon']; ?>

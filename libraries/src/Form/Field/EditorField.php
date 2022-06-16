@@ -8,10 +8,13 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Editor\Editor;
 use Joomla\CMS\Factory;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('textarea');
 
 /**
  * A textarea field for content creation
@@ -19,7 +22,7 @@ use Joomla\CMS\Factory;
  * @see    JEditor
  * @since  1.6
  */
-class EditorField extends TextareaField
+class EditorField extends \JFormFieldTextarea
 {
 	/**
 	 * The form field type.
@@ -100,14 +103,6 @@ class EditorField extends TextareaField
 	 * @since  3.2
 	 */
 	protected $editorType;
-
-	/**
-	 * The parent class of the field
-	 *
-	 * @var  string
-	 * @since 4.0.0
-	 */
-	protected $parentclass;
 
 	/**
 	 * Method to get certain otherwise inaccessible properties from the form field object.
@@ -191,7 +186,7 @@ class EditorField extends TextareaField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.
@@ -264,7 +259,7 @@ class EditorField extends TextareaField
 			$this->height,
 			$this->columns,
 			$this->rows,
-			$this->buttons ? (\is_array($this->buttons) ? array_merge($this->buttons, $this->hide) : $this->hide) : false,
+			$this->buttons ? (is_array($this->buttons) ? array_merge($this->buttons, $this->hide) : $this->hide) : false,
 			$this->id,
 			$this->asset,
 			$this->form->getValue($this->authorField),
@@ -294,28 +289,19 @@ class EditorField extends TextareaField
 				// Get the database object.
 				$db = Factory::getDbo();
 
-				// Build the query.
-				$query = $db->getQuery(true)
-					->select($db->quoteName('element'))
-					->from($db->quoteName('#__extensions'))
-					->where(
-						[
-							$db->quoteName('element') . ' = :editor',
-							$db->quoteName('folder') . ' = ' . $db->quote('editors'),
-							$db->quoteName('enabled') . ' = 1',
-						]
-					);
-
-				// Declare variable before binding.
-				$element = '';
-				$query->bind(':editor', $element);
-				$query->setLimit(1);
-
 				// Iterate over the types looking for an existing editor.
 				foreach ($types as $element)
 				{
-					// Check if the editor exists.
-					$db->setQuery($query);
+					// Build the query.
+					$query = $db->getQuery(true)
+						->select('element')
+						->from('#__extensions')
+						->where('element = ' . $db->quote($element))
+						->where('folder = ' . $db->quote('editors'))
+						->where('enabled = 1');
+
+					// Check of the editor exists.
+					$db->setQuery($query, 0, 1);
 					$editor = $db->loadResult();
 
 					// If an editor was found stop looking.
@@ -329,12 +315,33 @@ class EditorField extends TextareaField
 			// Create the JEditor instance based on the given editor.
 			if ($editor === null)
 			{
-				$editor = Factory::getApplication()->get('editor');
+				$editor = Factory::getConfig()->get('editor');
 			}
 
 			$this->editor = Editor::getInstance($editor);
 		}
 
 		return $this->editor;
+	}
+
+	/**
+	 * Method to get the JEditor output for an onSave event.
+	 *
+	 * @return  string  The JEditor object output.
+	 *
+	 * @since       1.6
+	 * @deprecated  4.0  Will be removed without replacement
+	 * @see         Editor::save()
+	 */
+	public function save()
+	{
+		$editor = $this->getEditor();
+
+		if (!method_exists($editor, 'save'))
+		{
+			return '';
+		}
+
+		return $editor->save($this->id);
 	}
 }

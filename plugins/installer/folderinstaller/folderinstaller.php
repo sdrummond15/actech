@@ -8,24 +8,20 @@
  */
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Plugin\PluginHelper;
-
 /**
  * FolderInstaller Plugin.
  *
  * @since  3.6.0
  */
-class PlgInstallerFolderInstaller extends CMSPlugin
+class PlgInstallerFolderInstaller extends JPlugin
 {
 	/**
-	 * Application object.
+	 * Load the language file on instantiation.
 	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
-	 * @since  4.0.0
+	 * @var    boolean
+	 * @since  3.6.0
 	 */
-	protected $app;
+	protected $autoloadLanguage = true;
 
 	/**
 	 * Textfield or Form of the Plugin.
@@ -36,16 +32,13 @@ class PlgInstallerFolderInstaller extends CMSPlugin
 	 */
 	public function onInstallerAddInstallationTab()
 	{
-		// Load language files
-		$this->loadLanguage();
-
 		$tab            = array();
 		$tab['name']    = 'folder';
-		$tab['label']   = Text::_('PLG_INSTALLER_FOLDERINSTALLER_TEXT');
+		$tab['label']   = JText::_('PLG_INSTALLER_FOLDERINSTALLER_TEXT');
 
 		// Render the input
 		ob_start();
-		include PluginHelper::getLayoutPath('installer', 'folderinstaller');
+		include JPluginHelper::getLayoutPath('installer', 'folderinstaller');
 		$tab['content'] = ob_get_clean();
 
 		return $tab;

@@ -8,14 +8,11 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\Form\FormField;
-use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\UCM\UCMType;
-use Joomla\Database\DatabaseQuery;
-use Joomla\Database\ParameterType;
 
 /**
  * Ordering field.
@@ -51,9 +48,10 @@ class OrderingField extends FormField
 	 */
 	public function __get($name)
 	{
-		if ($name === 'contentType')
+		switch ($name)
 		{
-			return $this->contentType;
+			case 'contentType':
+				return $this->contentType;
 		}
 
 		return parent::__get($name);
@@ -83,7 +81,7 @@ class OrderingField extends FormField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.
@@ -121,7 +119,7 @@ class OrderingField extends FormField
 		$attr = '';
 
 		// Initialize some field attributes.
-		$attr .= !empty($this->class) ? ' class="form-select' . $this->class . '"' : ' class="form-select"';
+		$attr .= !empty($this->class) ? ' class="' . $this->class . '"' : '';
 		$attr .= $this->disabled ? ' disabled' : '';
 		$attr .= !empty($this->size) ? ' size="' . $this->size . '"' : '';
 
@@ -135,13 +133,13 @@ class OrderingField extends FormField
 		// Create a read-only list (no name) with a hidden input to store the value.
 		if ($this->readonly)
 		{
-			$html[] = HTMLHelper::_('list.ordering', '', $query, trim($attr), $this->value, $itemId ? 0 : 1, $this->id);
-			$html[] = '<input type="hidden" name="' . $this->name . '" value="' . $this->value . '">';
+			$html[] = \JHtml::_('list.ordering', '', $query, trim($attr), $this->value, $itemId ? 0 : 1);
+			$html[] = '<input type="hidden" name="' . $this->name . '" value="' . $this->value . '"/>';
 		}
 		else
 		{
 			// Create a regular list.
-			$html[] = HTMLHelper::_('list.ordering', $this->name, $query, trim($attr), $this->value, $itemId ? 0 : 1, $this->id);
+			$html[] = \JHtml::_('list.ordering', $this->name, $query, trim($attr), $this->value, $itemId ? 0 : 1);
 		}
 
 		return implode($html);
@@ -150,7 +148,7 @@ class OrderingField extends FormField
 	/**
 	 * Builds the query for the ordering list.
 	 *
-	 * @return  DatabaseQuery  The query for the ordering form field
+	 * @return  \JDatabaseQuery  The query for the ordering form field
 	 *
 	 * @since   3.2
 	 */
@@ -161,12 +159,12 @@ class OrderingField extends FormField
 		$ucmRow       = $ucmType->getType($ucmType->getTypeId($this->contentType));
 		$ucmMapCommon = json_decode($ucmRow->field_mappings)->common;
 
-		if (\is_object($ucmMapCommon))
+		if (is_object($ucmMapCommon))
 		{
 			$ordering = $ucmMapCommon->core_ordering;
 			$title    = $ucmMapCommon->core_title;
 		}
-		elseif (\is_array($ucmMapCommon))
+		elseif (is_array($ucmMapCommon))
 		{
 			$ordering = $ucmMapCommon[0]->core_ordering;
 			$title    = $ucmMapCommon[0]->core_title;
@@ -174,11 +172,10 @@ class OrderingField extends FormField
 
 		$db    = Factory::getDbo();
 		$query = $db->getQuery(true);
-		$query->select([$db->quoteName($ordering, 'value'), $db->quoteName($title, 'text')])
+		$query->select(array($db->quoteName($ordering, 'value'), $db->quoteName($title, 'text')))
 			->from($db->quoteName(json_decode($ucmRow->table)->special->dbtable))
-			->where($db->quoteName('catid') . ' = :categoryId')
-			->order($db->quoteName('ordering'))
-			->bind(':categoryId', $categoryId, ParameterType::INTEGER);
+			->where($db->quoteName('catid') . ' = ' . (int) $categoryId)
+			->order('ordering');
 
 		return $query;
 	}

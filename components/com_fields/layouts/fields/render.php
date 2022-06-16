@@ -8,10 +8,8 @@
  */
 defined('_JEXEC') or die;
 
-use Joomla\Component\Fields\Administrator\Helper\FieldsHelper;
-
 // Check if we have all the data
-if (!array_key_exists('item', $displayData) || !array_key_exists('context', $displayData))
+if (!key_exists('item', $displayData) || !key_exists('context', $displayData))
 {
 	return;
 }
@@ -31,11 +29,13 @@ if (!$context)
 	return;
 }
 
+JLoader::register('FieldsHelper', JPATH_ADMINISTRATOR . '/components/com_fields/helpers/fields.php');
+
 $parts     = explode('.', $context);
 $component = $parts[0];
 $fields    = null;
 
-if (array_key_exists('fields', $displayData))
+if (key_exists('fields', $displayData))
 {
 	$fields = $displayData['fields'];
 }
@@ -64,19 +64,20 @@ foreach ($fields as $field)
 	$content = FieldsHelper::render($context, 'field.' . $layout, array('field' => $field));
 
 	// If the content is empty do nothing
-	if (trim($content) === '')
+	if (trim($content) === '') 
 	{
 		continue;
 	}
 
-	$output[] = '<li class="field-entry ' . $class . '">' . $content . '</li>';
+	$output[] = '<dd class="field-entry ' . $class . '">' . $content . '</dd>';
 }
 
 if (empty($output))
 {
 	return;
 }
+
 ?>
-<ul class="fields-container">
+<dl class="fields-container">
 	<?php echo implode("\n", $output); ?>
-</ul>
+</dl>

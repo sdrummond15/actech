@@ -8,14 +8,18 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
+
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('predefinedlist');
 
 /**
  * Plugin Status field.
  *
  * @since  3.5
  */
-class PluginstatusField extends PredefinedlistField
+class PluginstatusField extends \JFormFieldPredefinedList
 {
 	/**
 	 * The form field type.

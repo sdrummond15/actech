@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Helper;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Application\ApplicationHelper;
 use Joomla\CMS\Component\ComponentHelper;
@@ -52,7 +52,7 @@ class CMSHelper
 			}
 			else
 			{
-				$langCode = $app->getSession()->get('plg_system_languagefilter.language');
+				$langCode = Factory::getSession()->get('plg_system_languagefilter.language');
 			}
 		}
 
@@ -85,10 +85,9 @@ class CMSHelper
 	{
 		$db    = Factory::getDbo();
 		$query = $db->getQuery(true)
-			->select($db->quoteName('lang_id'))
-			->from($db->quoteName('#__languages'))
-			->where($db->quoteName('lang_code') . ' = :language')
-			->bind(':language', $langCode);
+			->select('lang_id')
+			->from('#__languages')
+			->where($db->quoteName('lang_code') . ' = ' . $db->quote($langCode));
 		$db->setQuery($query);
 
 		return $db->loadResult();

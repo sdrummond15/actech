@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Schema\ChangeItem;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Schema\ChangeItem;
 
@@ -39,9 +39,7 @@ class MysqlChangeItem extends ChangeItem
 	protected function buildCheckQuery()
 	{
 		// Initialize fields in case we can't create a check query
-
-		// Change status to skipped
-		$this->checkStatus = -1;
+		$this->checkStatus = -1; // change status to skipped
 		$result = null;
 
 		// Remove any newlines
@@ -53,33 +51,26 @@ class MysqlChangeItem extends ChangeItem
 		$updateQuery = preg_replace($find, $replace, $this->updateQuery);
 		$wordArray = preg_split("~'[^']*'(*SKIP)(*F)|\s+~u", trim($updateQuery, "; \t\n\r\0\x0B"));
 
-		// First, make sure we have an array of at least 5 elements
+		// First, make sure we have an array of at least 6 elements
 		// if not, we can't make a check query for this one
-		if (\count($wordArray) < 5)
+		if (count($wordArray) < 6)
 		{
 			// Done with method
 			return;
 		}
 
-		// We can only make check queries for rename table, alter table and create table queries
+		// We can only make check queries for alter table and create table queries
 		$command = strtoupper($wordArray[0] . ' ' . $wordArray[1]);
 
-		if ($command === 'RENAME TABLE')
+		// Check for special update statement to reset utf8mb4 conversion status
+		if (($command === 'UPDATE `#__UTF8_CONVERSION`'
+			|| $command === 'UPDATE #__UTF8_CONVERSION')
+			&& strtoupper($wordArray[2]) === 'SET'
+			&& strtolower(substr(str_replace('`', '', $wordArray[3]), 0, 9)) === 'converted')
 		{
-			$table = $this->fixQuote($wordArray[4]);
+			// Statement is special statement to reset conversion status
+			$this->queryType = 'UTF8CNV';
 
-			$this->checkQuery  = 'SHOW TABLES LIKE ' . $table;
-			$this->queryType   = 'RENAME_TABLE';
-			$this->msgElements = array($table);
-			$this->checkStatus = 0;
-
-			// Done with method
-			return;
-		}
-
-		// For the remaining query types make sure we have an array of at least 6 elements
-		if (\count($wordArray) < 6)
-		{
 			// Done with method
 			return;
 		}
@@ -163,7 +154,7 @@ class MysqlChangeItem extends ChangeItem
 				}
 
 				// Detect changes in NULL and in DEFAULT column attributes
-				$changesArray = \array_slice($wordArray, 6);
+				$changesArray = array_slice($wordArray, 6);
 				$defaultCheck = $this->checkDefault($changesArray, $type);
 				$nullCheck = $this->checkNull($changesArray);
 
@@ -191,7 +182,7 @@ class MysqlChangeItem extends ChangeItem
 				}
 
 				// Detect changes in NULL and in DEFAULT column attributes
-				$changesArray = \array_slice($wordArray, 6);
+				$changesArray = array_slice($wordArray, 6);
 				$defaultCheck = $this->checkDefault($changesArray, $type);
 				$nullCheck = $this->checkNull($changesArray);
 
@@ -397,7 +388,6 @@ class MysqlChangeItem extends ChangeItem
 	{
 		// Skip types that do not support default values
 		$type = strtolower($type);
-
 		if (substr($type, -4) === 'text' || substr($type, -4) === 'blob')
 		{
 			return false;

@@ -8,20 +8,9 @@
 
 namespace Joomla\CMS\MVC\Controller;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Application\CMSApplication;
-use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Form\FormFactoryAwareInterface;
-use Joomla\CMS\Form\FormFactoryAwareTrait;
-use Joomla\CMS\Form\FormFactoryInterface;
-use Joomla\CMS\Language\Text;
 use Joomla\CMS\MVC\Factory\MVCFactoryInterface;
-use Joomla\CMS\MVC\Model\BaseDatabaseModel;
-use Joomla\CMS\Router\Route;
-use Joomla\CMS\Uri\Uri;
-use Joomla\Input\Input;
 
 /**
  * Controller tailored to suit most form-based admin operations.
@@ -29,10 +18,8 @@ use Joomla\Input\Input;
  * @since  1.6
  * @todo   Add ability to set redirect manually to better cope with frontend usage.
  */
-class FormController extends BaseController implements FormFactoryAwareInterface
+class FormController extends BaseController
 {
-	use FormFactoryAwareTrait;
-
 	/**
 	 * The context for storing internal data, e.g. record.
 	 *
@@ -76,29 +63,24 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	/**
 	 * Constructor.
 	 *
-	 * @param   array                 $config       An optional associative array of configuration settings.
-	 *                                              Recognized key values include 'name', 'default_task', 'model_path', and
-	 *                                              'view_path' (this list is not meant to be comprehensive).
-	 * @param   MVCFactoryInterface   $factory      The factory.
-	 * @param   CMSApplication        $app          The Application for the dispatcher
-	 * @param   Input                 $input        Input
-	 * @param   FormFactoryInterface  $formFactory  The form factory.
+	 * @param   array                $config   An optional associative array of configuration settings.
+	 * @param   MVCFactoryInterface  $factory  The factory.
 	 *
-	 * @since   3.0
+	 * @see     \JControllerLegacy
+	 * @since   1.6
+	 * @throws  \Exception
 	 */
-	public function __construct($config = array(), MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null,
-		FormFactoryInterface $formFactory = null
-	)
+	public function __construct($config = array(), MVCFactoryInterface $factory = null)
 	{
-		parent::__construct($config, $factory, $app, $input);
+		parent::__construct($config, $factory);
 
 		// Guess the option as com_NameOfController
 		if (empty($this->option))
 		{
-			$this->option = ComponentHelper::getComponentName($this, $this->getName());
+			$this->option = 'com_' . strtolower($this->getName());
 		}
 
-		// Guess the \Text message prefix. Defaults to the option.
+		// Guess the \JText message prefix. Defaults to the option.
 		if (empty($this->text_prefix))
 		{
 			$this->text_prefix = strtoupper($this->option);
@@ -109,21 +91,12 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		{
 			$r = null;
 
-			$match = 'Controller';
-
-			// If there is a namespace append a backslash
-			if (strpos(\get_class($this), '\\'))
+			if (!preg_match('/(.*)Controller(.*)/i', get_class($this), $r))
 			{
-				$match .= '\\\\';
+				throw new \Exception(\JText::_('JLIB_APPLICATION_ERROR_CONTROLLER_GET_NAME'), 500);
 			}
 
-			if (!preg_match('/(.*)' . $match . '(.*)/i', \get_class($this), $r))
-			{
-				throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_GET_NAME', __METHOD__), 500);
-			}
-
-			// Remove the backslashes and the suffix controller
-			$this->context = str_replace(array('\\', 'controller'), '', strtolower($r[2]));
+			$this->context = strtolower($r[2]);
 		}
 
 		// Guess the item view as the context.
@@ -135,14 +108,33 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Guess the list view as the plural of the item view.
 		if (empty($this->view_list))
 		{
-			$this->view_list = \Joomla\String\Inflector::getInstance()->toPlural($this->view_item);
-		}
+			// @TODO Probably worth moving to an inflector class based on
+			// http://kuwamoto.org/2007/12/17/improved-pluralizing-in-php-actionscript-and-ror/
 
-		$this->setFormFactory($formFactory);
+			// Simple pluralisation based on public domain snippet by Paul Osman
+			// For more complex types, just manually set the variable in your class.
+			$plural = array(
+				array('/(x|ch|ss|sh)$/i', "$1es"),
+				array('/([^aeiouy]|qu)y$/i', "$1ies"),
+				array('/([^aeiouy]|qu)ies$/i', "$1y"),
+				array('/(bu)s$/i', "$1ses"),
+				array('/s$/i', 's'),
+				array('/$/', 's'),
+			);
+
+			// Check for matches using regular expressions
+			foreach ($plural as $pattern)
+			{
+				if (preg_match($pattern[0], $this->view_item))
+				{
+					$this->view_list = preg_replace($pattern[0], $pattern[1], $this->view_item);
+					break;
+				}
+			}
+		}
 
 		// Apply, Save & New, and Save As copy should be standard on forms.
 		$this->registerTask('apply', 'save');
-		$this->registerTask('save2menu', 'save');
 		$this->registerTask('save2new', 'save');
 		$this->registerTask('save2copy', 'save');
 		$this->registerTask('editAssociations', 'save');
@@ -163,10 +155,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		if (!$this->allowAdd())
 		{
 			// Set the internal error and also the redirect error.
-			$this->setMessage(Text::_('JLIB_APPLICATION_ERROR_CREATE_RECORD_NOT_PERMITTED'), 'error');
+			$this->setError(\JText::_('JLIB_APPLICATION_ERROR_CREATE_RECORD_NOT_PERMITTED'));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_list
 					. $this->getRedirectToListAppend(), false
 				)
@@ -176,11 +169,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		}
 
 		// Clear the record edit information from the session.
-		Factory::getApplication()->setUserState($context . '.data', null);
+		\JFactory::getApplication()->setUserState($context . '.data', null);
 
 		// Redirect to the edit screen.
 		$this->setRedirect(
-			Route::_(
+			\JRoute::_(
 				'index.php?option=' . $this->option . '&view=' . $this->view_item
 				. $this->getRedirectToItemAppend(), false
 			)
@@ -202,9 +195,9 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	 */
 	protected function allowAdd($data = array())
 	{
-		$user = Factory::getUser();
+		$user = \JFactory::getUser();
 
-		return $user->authorise('core.create', $this->option) || \count($user->getAuthorisedCategories($this->option, 'core.create'));
+		return $user->authorise('core.create', $this->option) || count($user->getAuthorisedCategories($this->option, 'core.create'));
 	}
 
 	/**
@@ -221,7 +214,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	 */
 	protected function allowEdit($data = array(), $key = 'id')
 	{
-		return Factory::getUser()->authorise('core.edit', $this->option);
+		return \JFactory::getUser()->authorise('core.edit', $this->option);
 	}
 
 	/**
@@ -238,7 +231,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	 */
 	protected function allowSave($data, $key = 'id')
 	{
-		$recordId = $data[$key] ?? '0';
+		$recordId = isset($data[$key]) ? $data[$key] : '0';
 
 		if ($recordId)
 		{
@@ -253,7 +246,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	/**
 	 * Method to run batch operations.
 	 *
-	 * @param   BaseDatabaseModel  $model  The model of the component being processed.
+	 * @param   \JModelLegacy  $model  The model of the component being processed.
 	 *
 	 * @return	boolean	 True if successful, false otherwise and internal error is set.
 	 *
@@ -270,7 +263,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Build an array of item contexts to check
 		$contexts = array();
 
-		$option = $this->extension ?? $this->option;
+		$option = isset($this->extension) ? $this->extension : $this->option;
 
 		foreach ($cid as $id)
 		{
@@ -281,13 +274,13 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Attempt to run the batch operation.
 		if ($model->batch($vars, $cid, $contexts))
 		{
-			$this->setMessage(Text::_('JLIB_APPLICATION_SUCCESS_BATCH'));
+			$this->setMessage(\JText::_('JLIB_APPLICATION_SUCCESS_BATCH'));
 
 			return true;
 		}
 		else
 		{
-			$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_BATCH_FAILED', $model->getError()), 'warning');
+			$this->setMessage(\JText::sprintf('JLIB_APPLICATION_ERROR_BATCH_FAILED', $model->getError()), 'warning');
 
 			return false;
 		}
@@ -318,13 +311,14 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		$recordId = $this->input->getInt($key);
 
 		// Attempt to check-in the current record.
-		if ($recordId && $table->hasField('checked_out') && $model->checkin($recordId) === false)
+		if ($recordId && property_exists($table, 'checked_out') && $model->checkin($recordId) === false)
 		{
 			// Check-in failed, go back to the record and display a notice.
-			$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()), 'error');
+			$this->setError(\JText::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $key), false
 				)
@@ -335,7 +329,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 
 		// Clean the session data and redirect.
 		$this->releaseEditId($context, $recordId);
-		Factory::getApplication()->setUserState($context . '.data', null);
+		\JFactory::getApplication()->setUserState($context . '.data', null);
 
 		$url = 'index.php?option=' . $this->option . '&view=' . $this->view_list
 			. $this->getRedirectToListAppend();
@@ -343,13 +337,13 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Check if there is a return value
 		$return = $this->input->get('return', null, 'base64');
 
-		if (!\is_null($return) && Uri::isInternal(base64_decode($return)))
+		if (!is_null($return) && \JUri::isInternal(base64_decode($return)))
 		{
 			$url = base64_decode($return);
 		}
 
 		// Redirect to the list screen.
-		$this->setRedirect(Route::_($url, false));
+		$this->setRedirect(\JRoute::_($url, false));
 
 		return true;
 	}
@@ -368,7 +362,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	public function edit($key = null, $urlVar = null)
 	{
 		// Do not cache the response to this, its a redirect, and mod_expires and google chrome browser bugs cache it forever!
-		Factory::getApplication()->allowCache(false);
+		\JFactory::getApplication()->allowCache(false);
 
 		$model = $this->getModel();
 		$table = $model->getTable();
@@ -388,16 +382,17 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		}
 
 		// Get the previous record id (if any) and the current record id.
-		$recordId = (int) (\count($cid) ? $cid[0] : $this->input->getInt($urlVar));
-		$checkin = $table->hasField('checked_out');
+		$recordId = (int) (count($cid) ? $cid[0] : $this->input->getInt($urlVar));
+		$checkin = property_exists($table, $table->getColumnAlias('checked_out'));
 
 		// Access check.
 		if (!$this->allowEdit(array($key => $recordId), $key))
 		{
-			$this->setMessage(Text::_('JLIB_APPLICATION_ERROR_EDIT_NOT_PERMITTED'), 'error');
+			$this->setError(\JText::_('JLIB_APPLICATION_ERROR_EDIT_NOT_PERMITTED'));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_list
 					. $this->getRedirectToListAppend(), false
 				)
@@ -410,10 +405,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		if ($checkin && !$model->checkout($recordId))
 		{
 			// Check-out failed, display a notice but allow the user to see the record.
-			$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_CHECKOUT_FAILED', $model->getError()), 'error');
+			$this->setError(\JText::sprintf('JLIB_APPLICATION_ERROR_CHECKOUT_FAILED', $model->getError()));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $urlVar), false
 				)
@@ -425,10 +421,10 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		{
 			// Check-out succeeded, push the new record id into the session.
 			$this->holdEditId($context, $recordId);
-			Factory::getApplication()->setUserState($context . '.data', null);
+			\JFactory::getApplication()->setUserState($context . '.data', null);
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $urlVar), false
 				)
@@ -445,7 +441,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	 * @param   string  $prefix  The class prefix. Optional.
 	 * @param   array   $config  Configuration array for model. Optional.
 	 *
-	 * @return  BaseDatabaseModel  The model.
+	 * @return  \JModelLegacy  The model.
 	 *
 	 * @since   1.6
 	 */
@@ -533,15 +529,90 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	 * Function that allows child controller access to model data
 	 * after the data has been saved.
 	 *
-	 * @param   BaseDatabaseModel  $model      The data model object.
-	 * @param   array              $validData  The validated data.
+	 * @param   \JModelLegacy  $model      The data model object.
+	 * @param   array          $validData  The validated data.
 	 *
 	 * @return  void
 	 *
 	 * @since   1.6
 	 */
-	protected function postSaveHook(BaseDatabaseModel $model, $validData = array())
+	protected function postSaveHook(\JModelLegacy $model, $validData = array())
 	{
+	}
+
+	/**
+	 * Method to load a row from version history
+	 *
+	 * @return  mixed  True if the record can be added, an error object if not.
+	 *
+	 * @since   3.2
+	 */
+	public function loadhistory()
+	{
+		$model = $this->getModel();
+		$table = $model->getTable();
+		$historyId = $this->input->getInt('version_id', null);
+
+		if (!$model->loadhistory($historyId, $table))
+		{
+			$this->setMessage($model->getError(), 'error');
+
+			$this->setRedirect(
+				\JRoute::_(
+					'index.php?option=' . $this->option . '&view=' . $this->view_list
+					. $this->getRedirectToListAppend(), false
+				)
+			);
+
+			return false;
+		}
+
+		// Determine the name of the primary key for the data.
+		if (empty($key))
+		{
+			$key = $table->getKeyName();
+		}
+
+		$recordId = $table->$key;
+
+		// To avoid data collisions the urlVar may be different from the primary key.
+		$urlVar = empty($this->urlVar) ? $key : $this->urlVar;
+
+		// Access check.
+		if (!$this->allowEdit(array($key => $recordId), $key))
+		{
+			$this->setError(\JText::_('JLIB_APPLICATION_ERROR_EDIT_NOT_PERMITTED'));
+			$this->setMessage($this->getError(), 'error');
+
+			$this->setRedirect(
+				\JRoute::_(
+					'index.php?option=' . $this->option . '&view=' . $this->view_list
+					. $this->getRedirectToListAppend(), false
+				)
+			);
+			$table->checkin();
+
+			return false;
+		}
+
+		$table->store();
+		$this->setRedirect(
+			\JRoute::_(
+				'index.php?option=' . $this->option . '&view=' . $this->view_item
+				. $this->getRedirectToItemAppend($recordId, $urlVar), false
+			)
+		);
+
+		$this->setMessage(
+			\JText::sprintf(
+				'JLIB_APPLICATION_SUCCESS_LOAD_HISTORY', $model->getState('save_date'), $model->getState('version_note')
+			)
+		);
+
+		// Invoke the postSave method to allow for the child class to access the model.
+		$this->postSaveHook($model);
+
+		return true;
 	}
 
 	/**
@@ -559,11 +630,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Check for request forgeries.
 		$this->checkToken();
 
-		$app   = Factory::getApplication();
+		$app   = \JFactory::getApplication();
 		$model = $this->getModel();
 		$table = $model->getTable();
 		$data  = $this->input->post->get('jform', array(), 'array');
-		$checkin = $table->hasField('checked_out');
+		$checkin = property_exists($table, $table->getColumnAlias('checked_out'));
 		$context = "$this->option.edit.$this->context";
 		$task = $this->getTask();
 
@@ -591,10 +662,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 			if ($checkin && $model->checkin($data[$key]) === false)
 			{
 				// Check-in failed. Go back to the item and display a notice.
-				$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()), 'error');
+				$this->setError(\JText::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()));
+				$this->setMessage($this->getError(), 'error');
 
 				$this->setRedirect(
-					Route::_(
+					\JRoute::_(
 						'index.php?option=' . $this->option . '&view=' . $this->view_item
 						. $this->getRedirectToItemAppend($recordId, $urlVar), false
 					)
@@ -612,10 +684,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Access check.
 		if (!$this->allowSave($data, $key))
 		{
-			$this->setMessage(Text::_('JLIB_APPLICATION_ERROR_SAVE_NOT_PERMITTED'), 'error');
+			$this->setError(\JText::_('JLIB_APPLICATION_ERROR_SAVE_NOT_PERMITTED'));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_list
 					. $this->getRedirectToListAppend(), false
 				)
@@ -653,7 +726,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 			$errors = $model->getErrors();
 
 			// Push up to three validation messages out to the user.
-			for ($i = 0, $n = \count($errors); $i < $n && $i < 3; $i++)
+			for ($i = 0, $n = count($errors); $i < $n && $i < 3; $i++)
 			{
 				if ($errors[$i] instanceof \Exception)
 				{
@@ -666,7 +739,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 			}
 
 			/**
-			 * We need the filtered value of calendar fields because the UTC normalisation is
+			 * We need the filtered value of calendar fields because the UTC normalision is
 			 * done in the filter and on output. This would apply the Timezone offset on
 			 * reload. We set the calendar values we save to the processed date.
 			 */
@@ -690,7 +763,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 
 			// Redirect back to the edit screen.
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $urlVar), false
 				)
@@ -701,7 +774,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 
 		if (!isset($validData['tags']))
 		{
-			$validData['tags'] = array();
+			$validData['tags'] = null;
 		}
 
 		// Attempt to save the data.
@@ -711,10 +784,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 			$app->setUserState($context . '.data', $validData);
 
 			// Redirect back to the edit screen.
-			$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_SAVE_FAILED', $model->getError()), 'error');
+			$this->setError(\JText::sprintf('JLIB_APPLICATION_ERROR_SAVE_FAILED', $model->getError()));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $urlVar), false
 				)
@@ -730,10 +804,11 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 			$app->setUserState($context . '.data', $validData);
 
 			// Check-in failed, so go back to the record and display a notice.
-			$this->setMessage(Text::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()), 'error');
+			$this->setError(\JText::sprintf('JLIB_APPLICATION_ERROR_CHECKIN_FAILED', $model->getError()));
+			$this->setMessage($this->getError(), 'error');
 
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_item
 					. $this->getRedirectToItemAppend($recordId, $urlVar), false
 				)
@@ -743,23 +818,23 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		}
 
 		$langKey = $this->text_prefix . ($recordId === 0 && $app->isClient('site') ? '_SUBMIT' : '') . '_SAVE_SUCCESS';
-		$prefix  = Factory::getLanguage()->hasKey($langKey) ? $this->text_prefix : 'JLIB_APPLICATION';
+		$prefix  = \JFactory::getLanguage()->hasKey($langKey) ? $this->text_prefix : 'JLIB_APPLICATION';
 
-		$this->setMessage(Text::_($prefix . ($recordId === 0 && $app->isClient('site') ? '_SUBMIT' : '') . '_SAVE_SUCCESS'));
+		$this->setMessage(\JText::_($prefix . ($recordId === 0 && $app->isClient('site') ? '_SUBMIT' : '') . '_SAVE_SUCCESS'));
 
 		// Redirect the user and adjust session state based on the chosen task.
 		switch ($task)
 		{
 			case 'apply':
 				// Set the record data in the session.
-				$recordId = $model->getState($model->getName() . '.id');
+				$recordId = $model->getState($this->context . '.id');
 				$this->holdEditId($context, $recordId);
 				$app->setUserState($context . '.data', null);
 				$model->checkout($recordId);
 
 				// Redirect back to the edit screen.
 				$this->setRedirect(
-					Route::_(
+					\JRoute::_(
 						'index.php?option=' . $this->option . '&view=' . $this->view_item
 						. $this->getRedirectToItemAppend($recordId, $urlVar), false
 					)
@@ -773,7 +848,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 
 				// Redirect back to the edit screen.
 				$this->setRedirect(
-					Route::_(
+					\JRoute::_(
 						'index.php?option=' . $this->option . '&view=' . $this->view_item
 						. $this->getRedirectToItemAppend(null, $urlVar), false
 					)
@@ -791,13 +866,13 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 				// Check if there is a return value
 				$return = $this->input->get('return', null, 'base64');
 
-				if (!\is_null($return) && Uri::isInternal(base64_decode($return)))
+				if (!is_null($return) && \JUri::isInternal(base64_decode($return)))
 				{
 					$url = base64_decode($return);
 				}
 
 				// Redirect to the list screen.
-				$this->setRedirect(Route::_($url, false));
+				$this->setRedirect(\JRoute::_($url, false));
 				break;
 		}
 
@@ -822,7 +897,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		// Check for request forgeries.
 		$this->checkToken();
 
-		$app     = Factory::getApplication();
+		$app     = \JFactory::getApplication();
 		$model   = $this->getModel();
 		$data    = $this->input->post->get('jform', array(), 'array');
 
@@ -847,7 +922,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		if (($recordId && !$this->allowEdit($data, $key)) || (!$recordId && !$this->allowAdd($data)))
 		{
 			$this->setRedirect(
-				Route::_(
+				\JRoute::_(
 					'index.php?option=' . $this->option . '&view=' . $this->view_list
 					. $this->getRedirectToListAppend(), false
 				)
@@ -856,17 +931,17 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 		}
 
 		// The redirect url
-		$redirectUrl = Route::_(
+		$redirectUrl = \JRoute::_(
 			'index.php?option=' . $this->option . '&view=' . $this->view_item .
 			$this->getRedirectToItemAppend($recordId, $urlVar),
 			false
 		);
 
-		/** @var \Joomla\CMS\Form\Form $form */
+		/* @var \JForm $form */
 		$form = $model->getForm($data, false);
 
 		/**
-		 * We need the filtered value of calendar fields because the UTC normalisation is
+		 * We need the filtered value of calendar fields because the UTC normalision is
 		 * done in the filter and on output. This would apply the Timezone offset on
 		 * reload. We set the calendar values we save to the processed date.
 		 */
@@ -914,7 +989,7 @@ class FormController extends BaseController implements FormFactoryAwareInterface
 	public function editAssociations()
 	{
 		// Initialise variables.
-		$app   = Factory::getApplication();
+		$app   = \JFactory::getApplication();
 		$input = $app->input;
 		$model = $this->getModel();
 

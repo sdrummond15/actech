@@ -8,20 +8,9 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Access\Rules;
-use Joomla\CMS\Event\AbstractEvent;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Path;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Object\CMSObject;
-use Joomla\Database\DatabaseDriver;
-use Joomla\Database\DatabaseQuery;
-use Joomla\Event\DispatcherAwareInterface;
-use Joomla\Event\DispatcherAwareTrait;
-use Joomla\Event\DispatcherInterface;
-use Joomla\String\StringHelper;
+\JLoader::import('joomla.filesystem.path');
 
 /**
  * Abstract Table class
@@ -29,11 +18,10 @@ use Joomla\String\StringHelper;
  * Parent class to all tables.
  *
  * @since  1.7.0
+ * @tutorial  Joomla.Platform/jtable.cls
  */
-abstract class Table extends CMSObject implements TableInterface, DispatcherAwareInterface
+abstract class Table extends \JObject implements \JObservableInterface, \JTableInterface
 {
-	use DispatcherAwareTrait;
-
 	/**
 	 * Include paths for searching for Table classes.
 	 *
@@ -75,9 +63,9 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	protected $_tbl_keys = array();
 
 	/**
-	 * DatabaseDriver object.
+	 * \JDatabaseDriver object.
 	 *
-	 * @var    DatabaseDriver
+	 * @var    \JDatabaseDriver
 	 * @since  1.7.0
 	 */
 	protected $_db;
@@ -93,7 +81,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	/**
 	 * The rules associated with this record.
 	 *
-	 * @var    Rules  A Rules object.
+	 * @var    \JAccessRules  A \JAccessRules object.
 	 * @since  1.7.0
 	 */
 	protected $_rules;
@@ -113,6 +101,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 * @since  3.1.4
 	 */
 	protected $_autoincrement = true;
+
+	/**
+	 * Generic observers for this Table (Used e.g. for tags Processing)
+	 *
+	 * @var    \JObserverUpdater
+	 * @since  3.1.2
+	 */
+	protected $_observers;
 
 	/**
 	 * Array with alias for "special" columns such as ordering, hits etc etc
@@ -139,45 +135,34 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	protected $_supportNullValue = false;
 
 	/**
-	 * The UCM type alias. Used for tags, content versioning etc. Leave blank to effectively disable these features.
-	 *
-	 * @var    string
-	 * @since  4.0.0
-	 */
-	public $typeAlias = null;
-
-	/**
 	 * Object constructor to set table and key fields.  In most cases this will
 	 * be overridden by child classes to explicitly set the table and key fields
 	 * for a particular database table.
 	 *
-	 * @param   string               $table       Name of the table to model.
-	 * @param   mixed                $key         Name of the primary key field in the table or array of field names that compose the primary key.
-	 * @param   DatabaseDriver       $db          DatabaseDriver object.
-	 * @param   DispatcherInterface  $dispatcher  Event dispatcher for this table
+	 * @param   string            $table  Name of the table to model.
+	 * @param   mixed             $key    Name of the primary key field in the table or array of field names that compose the primary key.
+	 * @param   \JDatabaseDriver  $db     \JDatabaseDriver object.
 	 *
 	 * @since   1.7.0
 	 */
-	public function __construct($table, $key, DatabaseDriver $db, DispatcherInterface $dispatcher = null)
+	public function __construct($table, $key, $db)
 	{
-		parent::__construct();
-
 		// Set internal variables.
 		$this->_tbl = $table;
 
 		// Set the key to be an array.
-		if (\is_string($key))
+		if (is_string($key))
 		{
 			$key = array($key);
 		}
-		elseif (\is_object($key))
+		elseif (is_object($key))
 		{
 			$key = (array) $key;
 		}
 
 		$this->_tbl_keys = $key;
 
-		if (\count($key) == 1)
+		if (count($key) == 1)
 		{
 			$this->_autoincrement = true;
 		}
@@ -199,7 +184,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			foreach ($fields as $name => $v)
 			{
 				// Add the field if it is not already present.
-				if (!$this->hasField($name))
+				if (!property_exists($this, $name))
 				{
 					$this->$name = null;
 				}
@@ -207,33 +192,52 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		}
 
 		// If we are tracking assets, make sure an access field exists and initially set the default.
-		if ($this->hasField('asset_id'))
+		if (property_exists($this, 'asset_id'))
 		{
 			$this->_trackAssets = true;
 		}
 
 		// If the access property exists, set the default.
-		if ($this->hasField('access'))
+		if (property_exists($this, 'access'))
 		{
-			$this->access = (int) Factory::getApplication()->get('access');
+			$this->access = (int) \JFactory::getConfig()->get('access');
 		}
 
-		// Create or set a Dispatcher
-		if (!\is_object($dispatcher) || !($dispatcher instanceof DispatcherInterface))
-		{
-			// @todo Maybe we should use a dedicated "behaviour" dispatcher for performance reasons and to prevent system plugins from butting in?
-			$dispatcher = Factory::getApplication()->getDispatcher();
-		}
+		// Implement \JObservableInterface:
+		// Create observer updater and attaches all observers interested by $this class:
+		$this->_observers = new \JObserverUpdater($this);
+		\JObserverMapper::attachAllObservers($this);
+	}
 
-		$this->setDispatcher($dispatcher);
+	/**
+	 * Implement \JObservableInterface:
+	 * Adds an observer to this instance.
+	 * This method will be called fron the constructor of classes implementing \JObserverInterface
+	 * which is instanciated by the constructor of $this with \JObserverMapper::attachAllObservers($this)
+	 *
+	 * @param   \JObserverInterface|\JTableObserver  $observer  The observer object
+	 *
+	 * @return  void
+	 *
+	 * @since   3.1.2
+	 */
+	public function attachObserver(\JObserverInterface $observer)
+	{
+		$this->_observers->attachObserver($observer);
+	}
 
-		$event = AbstractEvent::create(
-			'onTableObjectCreate',
-			[
-				'subject'	=> $this,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableObjectCreate', $event);
+	/**
+	 * Gets the instance of the observer of class $observerClass
+	 *
+	 * @param   string  $observerClass  The observer class-name to return the object of
+	 *
+	 * @return  \JTableObserver|null
+	 *
+	 * @since   3.1.2
+	 */
+	public function getObserverOfClass($observerClass)
+	{
+		return $this->_observers->getObserverOfClass($observerClass);
 	}
 
 	/**
@@ -278,8 +282,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 *
 	 * @return  Table|boolean   A Table object if found or boolean false on failure.
 	 *
-	 * @since       1.7.0
-	 * @deprecated  5.0 Use the MvcFactory instead
+	 * @since   1.7.0
 	 */
 	public static function getInstance($type, $prefix = 'JTable', $config = array())
 	{
@@ -291,12 +294,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		if (!class_exists($tableClass))
 		{
 			// Search for the class file in the JTable include paths.
+			jimport('joomla.filesystem.path');
+
 			$paths = self::addIncludePath();
 			$pathIndex = 0;
 
-			while (!class_exists($tableClass) && $pathIndex < \count($paths))
+			while (!class_exists($tableClass) && $pathIndex < count($paths))
 			{
-				if ($tryThis = Path::find($paths[$pathIndex++], strtolower($type) . '.php'))
+				if ($tryThis = \JPath::find($paths[$pathIndex++], strtolower($type) . '.php'))
 				{
 					// Import the class file.
 					include_once $tryThis;
@@ -316,14 +321,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			}
 		}
 
-		// If a database object was passed in the configuration array use it, otherwise get the global one from Factory.
-		$db = $config['dbo'] ?? Factory::getDbo();
-
-		// Check for a possible service from the container otherwise manually instantiate the class
-		if (Factory::getContainer()->has($tableClass))
-		{
-			return Factory::getContainer()->get($tableClass);
-		}
+		// If a database object was passed in the configuration array use it, otherwise get the global one from \JFactory.
+		$db = isset($config['dbo']) ? $config['dbo'] : \JFactory::getDbo();
 
 		// Instantiate a new table class and return it.
 		return new $tableClass($db);
@@ -336,8 +335,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 *
 	 * @return  array  An array of filesystem paths to find Table classes in.
 	 *
-	 * @since       1.7.0
-	 * @deprecated  5.0 Should not be used anymore as tables are loaded through the MvcFactory
+	 * @since   1.7.0
 	 */
 	public static function addIncludePath($path = null)
 	{
@@ -360,7 +358,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				$dir = trim($dir);
 
 				// Add to the front of the list so that custom paths are searched first.
-				if (!\in_array($dir, self::$_includePaths))
+				if (!in_array($dir, self::$_includePaths))
 				{
 					array_unshift(self::$_includePaths, $dir);
 				}
@@ -423,7 +421,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	protected function _getAssetParentId(Table $table = null, $id = null)
 	{
 		// For simple cases, parent to the asset root.
-		/** @var Asset $assets */
+		/** @var  \JTableAsset  $assets */
 		$assets = self::getInstance('Asset', 'JTable', array('dbo' => $this->getDbo()));
 		$rootId = $assets->getRootId();
 
@@ -438,8 +436,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	/**
 	 * Method to append the primary keys for this table to a query.
 	 *
-	 * @param   DatabaseQuery  $query  A query object to append.
-	 * @param   mixed          $pk     Optional primary key parameter.
+	 * @param   \JDatabaseQuery  $query  A query object to append.
+	 * @param   mixed            $pk     Optional primary key parameter.
 	 *
 	 * @return  void
 	 *
@@ -447,7 +445,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function appendPrimaryKeys($query, $pk = null)
 	{
-		if (\is_null($pk))
+		if (is_null($pk))
 		{
 			foreach ($this->_tbl_keys as $k)
 			{
@@ -456,7 +454,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		}
 		else
 		{
-			if (\is_string($pk))
+			if (is_string($pk))
 			{
 				$pk = array($this->_tbl_key => $pk);
 			}
@@ -494,7 +492,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function getKeyName($multiple = false)
 	{
 		// Count the number of keys
-		if (\count($this->_tbl_keys))
+		if (count($this->_tbl_keys))
 		{
 			if ($multiple)
 			{
@@ -512,23 +510,9 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	}
 
 	/**
-	 * Returns the identity (primary key) value of this record
+	 * Method to get the \JDatabaseDriver object.
 	 *
-	 * @return  mixed
-	 *
-	 * @since   4.0.0
-	 */
-	public function getId()
-	{
-		$key = $this->getKeyName();
-
-		return $this->$key;
-	}
-
-	/**
-	 * Method to get the DatabaseDriver object.
-	 *
-	 * @return  DatabaseDriver  The internal database driver object.
+	 * @return  \JDatabaseDriver  The internal database driver object.
 	 *
 	 * @since   1.7.0
 	 */
@@ -538,15 +522,15 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	}
 
 	/**
-	 * Method to set the DatabaseDriver object.
+	 * Method to set the \JDatabaseDriver object.
 	 *
-	 * @param   DatabaseDriver  $db  A DatabaseDriver object to be used by the table object.
+	 * @param   \JDatabaseDriver  $db  A \JDatabaseDriver object to be used by the table object.
 	 *
 	 * @return  boolean  True on success.
 	 *
 	 * @since   1.7.0
 	 */
-	public function setDbo(DatabaseDriver $db)
+	public function setDbo($db)
 	{
 		$this->_db = $db;
 
@@ -556,7 +540,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	/**
 	 * Method to set rules for the record.
 	 *
-	 * @param   mixed  $input  A Rules object, JSON string, or array.
+	 * @param   mixed  $input  A \JAccessRules object, JSON string, or array.
 	 *
 	 * @return  void
 	 *
@@ -564,20 +548,20 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function setRules($input)
 	{
-		if ($input instanceof Rules)
+		if ($input instanceof \JAccessRules)
 		{
 			$this->_rules = $input;
 		}
 		else
 		{
-			$this->_rules = new Rules($input);
+			$this->_rules = new \JAccessRules($input);
 		}
 	}
 
 	/**
 	 * Method to get the rules for the record.
 	 *
-	 * @return  Rules object
+	 * @return  \JAccessRules object
 	 *
 	 * @since   1.7.0
 	 */
@@ -597,19 +581,11 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function reset()
 	{
-		$event = AbstractEvent::create(
-			'onTableBeforeReset',
-			[
-				'subject'	=> $this,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeReset', $event);
-
 		// Get the default values for the class from the table.
 		foreach ($this->getFields() as $k => $v)
 		{
 			// If the property is not the primary key or private, reset it.
-			if (!\in_array($k, $this->_tbl_keys) && (strpos($k, '_') !== 0))
+			if (!in_array($k, $this->_tbl_keys) && (strpos($k, '_') !== 0))
 			{
 				$this->$k = $v->Default;
 			}
@@ -617,14 +593,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 
 		// Reset table errors
 		$this->_errors = array();
-
-		$event = AbstractEvent::create(
-			'onTableAfterReset',
-			[
-				'subject'	=> $this,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterReset', $event);
 	}
 
 	/**
@@ -643,35 +611,25 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function bind($src, $ignore = array())
 	{
 		// Check if the source value is an array or object
-		if (!\is_object($src) && !\is_array($src))
+		if (!is_object($src) && !is_array($src))
 		{
 			throw new \InvalidArgumentException(
 				sprintf(
 					'Could not bind the data source in %1$s::bind(), the source must be an array or object but a "%2$s" was given.',
-					\get_class($this),
-					\gettype($src)
+					get_class($this),
+					gettype($src)
 				)
 			);
 		}
 
 		// If the ignore value is a string, explode it over spaces.
-		if (!\is_array($ignore))
+		if (!is_array($ignore))
 		{
 			$ignore = explode(' ', $ignore);
 		}
 
-		$event = AbstractEvent::create(
-			'onTableBeforeBind',
-			[
-				'subject'	=> $this,
-				'src'		=> $src,
-				'ignore'	=> $ignore
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeBind', $event);
-
 		// If the source value is an object, get its accessible properties.
-		if (\is_object($src))
+		if (is_object($src))
 		{
 			$src = get_object_vars($src);
 		}
@@ -681,7 +639,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		{
 			foreach ($this->_jsonEncode as $field)
 			{
-				if (isset($src[$field]) && \is_array($src[$field]))
+				if (isset($src[$field]) && is_array($src[$field]))
 				{
 					$src[$field] = json_encode($src[$field]);
 				}
@@ -692,7 +650,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		foreach ($this->getProperties() as $k => $v)
 		{
 			// Only process fields not in the ignore array.
-			if (!\in_array($k, $ignore))
+			if (!in_array($k, $ignore))
 			{
 				if (isset($src[$k]))
 				{
@@ -700,16 +658,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				}
 			}
 		}
-
-		$event = AbstractEvent::create(
-			'onTableAfterBind',
-			[
-				'subject'	=> $this,
-				'src'		=> $src,
-				'ignore'	=> $ignore
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterBind', $event);
 
 		return true;
 	}
@@ -730,16 +678,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function load($keys = null, $reset = true)
 	{
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeLoad',
-			[
-				'subject'	=> $this,
-				'keys'		=> $keys,
-				'reset'		=> $reset,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeLoad', $event);
+		// Implement \JObservableInterface: Pre-processing by observers
+		$this->_observers->update('onBeforeLoad', array($keys, $reset));
 
 		if (empty($keys))
 		{
@@ -759,10 +699,10 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				return true;
 			}
 		}
-		elseif (!\is_array($keys))
+		elseif (!is_array($keys))
 		{
 			// Load by primary key.
-			$keyCount = \count($this->_tbl_keys);
+			$keyCount = count($this->_tbl_keys);
 
 			if ($keyCount)
 			{
@@ -793,9 +733,9 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		foreach ($keys as $field => $value)
 		{
 			// Check that $field is in the table.
-			if (!\in_array($field, $fields))
+			if (!in_array($field, $fields))
 			{
-				throw new \UnexpectedValueException(sprintf('Missing field in database: %s &#160; %s.', \get_class($this), $field));
+				throw new \UnexpectedValueException(sprintf('Missing field in database: %s &#160; %s.', get_class($this), $field));
 			}
 
 			// Add the search tuple to the query.
@@ -817,16 +757,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			$result = $this->bind($row);
 		}
 
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterLoad',
-			[
-				'subject'		=> $this,
-				'result'		=> &$result,
-				'row'			=> $row,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterLoad', $event);
+		// Implement \JObservableInterface: Post-processing by observers
+		$this->_observers->update('onAfterLoad', array(&$result, $row));
 
 		return $result;
 	}
@@ -842,15 +774,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function check()
 	{
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableCheck',
-			[
-				'subject'		=> $this,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableCheck', $event);
-
 		return true;
 	}
 
@@ -872,16 +795,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 
 		$k = $this->_tbl_keys;
 
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeStore',
-			[
-				'subject'		=> $this,
-				'updateNulls'	=> $updateNulls,
-				'k'				=> $k,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeStore', $event);
+		// Implement \JObservableInterface: Pre-processing by observers
+		$this->_observers->update('onBeforeStore', array($updateNulls, $k));
 
 		$currentAssetId = 0;
 
@@ -896,29 +811,15 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			unset($this->asset_id);
 		}
 
-		// We have to unset typeAlias since updateObject / insertObject will try to insert / update all public variables...
-		$typeAlias = $this->typeAlias;
-		unset($this->typeAlias);
-
-		try
+		// If a primary key exists update the object, otherwise insert it.
+		if ($this->hasPrimaryKey())
 		{
-			// If a primary key exists update the object, otherwise insert it.
-			if ($this->hasPrimaryKey())
-			{
-				$this->_db->updateObject($this->_tbl, $this, $this->_tbl_keys, $updateNulls);
-			}
-			else
-			{
-				$this->_db->insertObject($this->_tbl, $this, $this->_tbl_keys[0]);
-			}
+			$this->_db->updateObject($this->_tbl, $this, $this->_tbl_keys, $updateNulls);
 		}
-		catch (\Exception $e)
+		else
 		{
-			$this->setError($e->getMessage());
-			$result = false;
+			$this->_db->insertObject($this->_tbl, $this, $this->_tbl_keys[0]);
 		}
-
-		$this->typeAlias = $typeAlias;
 
 		// If the table is not set to track assets return true.
 		if ($this->_trackAssets)
@@ -935,7 +836,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			$name     = $this->_getAssetName();
 			$title    = $this->_getAssetTitle();
 
-			/** @var Asset $asset */
+			/** @var  \JTableAsset  $asset */
 			$asset = self::getInstance('Asset', 'JTable', array('dbo' => $this->getDbo()));
 			$asset->loadByName($name);
 
@@ -962,11 +863,9 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				// Prepare the asset to be stored.
 				$asset->parent_id = $parentId;
 				$asset->name      = $name;
+				$asset->title     = $title;
 
-				// Respect the table field limits
-				$asset->title = StringHelper::substr($title, 0, 100);
-
-				if ($this->_rules instanceof Rules)
+				if ($this->_rules instanceof \JAccessRules)
 				{
 					$asset->rules = (string) $this->_rules;
 				}
@@ -995,15 +894,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			}
 		}
 
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterStore',
-			[
-				'subject'	=> $this,
-				'result'	=> &$result,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterStore', $event);
+		// Implement \JObservableInterface: Post-processing by observers
+		$this->_observers->update('onAfterStore', array(&$result));
 
 		return $result;
 	}
@@ -1044,7 +936,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		}
 
 		// Attempt to check the row in, just in case it was checked out.
-		if (!$this->checkIn())
+		if (!$this->checkin())
 		{
 			return false;
 		}
@@ -1074,7 +966,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function delete($pk = null)
 	{
-		if (\is_null($pk))
+		if (is_null($pk))
 		{
 			$pk = array();
 
@@ -1083,14 +975,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				$pk[$key] = $this->$key;
 			}
 		}
-		elseif (!\is_array($pk))
+		elseif (!is_array($pk))
 		{
 			$pk = array($this->_tbl_key => $pk);
 		}
 
 		foreach ($this->_tbl_keys as $key)
 		{
-			$pk[$key] = \is_null($pk[$key]) ? $this->$key : $pk[$key];
+			$pk[$key] = is_null($pk[$key]) ? $this->$key : $pk[$key];
 
 			if ($pk[$key] === null)
 			{
@@ -1100,23 +992,15 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			$this->$key = $pk[$key];
 		}
 
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeDelete',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeDelete', $event);
+		// Implement \JObservableInterface: Pre-processing by observers
+		$this->_observers->update('onBeforeDelete', array($pk));
 
 		// If tracking assets, remove the asset first.
 		if ($this->_trackAssets)
 		{
 			// Get the asset name
 			$name  = $this->_getAssetName();
-
-			/** @var Asset $asset */
+			/** @var  \JTableAsset  $asset */
 			$asset = self::getInstance('Asset');
 
 			if ($asset->loadByName($name))
@@ -1140,15 +1024,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		// Check for a database error.
 		$this->_db->execute();
 
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterDelete',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterDelete', $event);
+		// Implement \JObservableInterface: Post-processing by observers
+		$this->_observers->update('onAfterDelete', array($pk));
 
 		return true;
 	}
@@ -1170,24 +1047,16 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function checkOut($userId, $pk = null)
 	{
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeCheckout',
-			[
-				'subject'	=> $this,
-				'userId'	=> $userId,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeCheckout', $event);
+		$checkedOutField = $this->getColumnAlias('checked_out');
+		$checkedOutTimeField = $this->getColumnAlias('checked_out_time');
 
 		// If there is no checked_out or checked_out_time field, just return true.
-		if (!$this->hasField('checked_out') || !$this->hasField('checked_out_time'))
+		if (!property_exists($this, $checkedOutField) || !property_exists($this, $checkedOutTimeField))
 		{
 			return true;
 		}
 
-		if (\is_null($pk))
+		if (is_null($pk))
 		{
 			$pk = array();
 
@@ -1196,14 +1065,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				$pk[$key] = $this->$key;
 			}
 		}
-		elseif (!\is_array($pk))
+		elseif (!is_array($pk))
 		{
 			$pk = array($this->_tbl_key => $pk);
 		}
 
 		foreach ($this->_tbl_keys as $key)
 		{
-			$pk[$key] = \is_null($pk[$key]) ? $this->$key : $pk[$key];
+			$pk[$key] = is_null($pk[$key]) ? $this->$key : $pk[$key];
 
 			if ($pk[$key] === null)
 			{
@@ -1211,12 +1080,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			}
 		}
 
-		// Get column names.
-		$checkedOutField     = $this->getColumnAlias('checked_out');
-		$checkedOutTimeField = $this->getColumnAlias('checked_out_time');
-
 		// Get the current time in the database format.
-		$time = Factory::getDate()->toSql();
+		$time = \JFactory::getDate()->toSql();
 
 		// Check the row out by primary key.
 		$query = $this->_db->getQuery(true)
@@ -1230,17 +1095,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		// Set table values in the object.
 		$this->$checkedOutField      = (int) $userId;
 		$this->$checkedOutTimeField = $time;
-
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterCheckout',
-			[
-				'subject'	=> $this,
-				'userId'	=> $userId,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterCheckout', $event);
 
 		return true;
 	}
@@ -1259,23 +1113,16 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function checkIn($pk = null)
 	{
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeCheckin',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeCheckin', $event);
+		$checkedOutField = $this->getColumnAlias('checked_out');
+		$checkedOutTimeField = $this->getColumnAlias('checked_out_time');
 
 		// If there is no checked_out or checked_out_time field, just return true.
-		if (!$this->hasField('checked_out') || !$this->hasField('checked_out_time'))
+		if (!property_exists($this, $checkedOutField) || !property_exists($this, $checkedOutTimeField))
 		{
 			return true;
 		}
 
-		if (\is_null($pk))
+		if (is_null($pk))
 		{
 			$pk = array();
 
@@ -1284,7 +1131,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				$pk[$this->$key] = $this->$key;
 			}
 		}
-		elseif (!\is_array($pk))
+		elseif (!is_array($pk))
 		{
 			$pk = array($this->_tbl_key => $pk);
 		}
@@ -1298,10 +1145,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				throw new \UnexpectedValueException('Null primary key not allowed.');
 			}
 		}
-
-		// Get column names.
-		$checkedOutField     = $this->getColumnAlias('checked_out');
-		$checkedOutTimeField = $this->getColumnAlias('checked_out_time');
 
 		$nullDate = $this->_supportNullValue ? 'NULL' : $this->_db->quote($this->_db->getNullDate());
 		$nullID   = $this->_supportNullValue ? 'NULL' : '0';
@@ -1321,17 +1164,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		$this->$checkedOutField     = $this->_supportNullValue ? null : 0;
 		$this->$checkedOutTimeField = $this->_supportNullValue ? null : '';
 
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterCheckin',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterCheckin', $event);
-
-		Factory::getApplication()->triggerEvent('onAfterCheckin', array($this->_tbl));
+		$dispatcher = \JEventDispatcher::getInstance();
+		$dispatcher->trigger('onAfterCheckin', array($this->_tbl));
 
 		return true;
 	}
@@ -1389,23 +1223,15 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function hit($pk = null)
 	{
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeHit',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeHit', $event);
+		$hitsField = $this->getColumnAlias('hits');
 
 		// If there is no hits field, just return true.
-		if (!$this->hasField('hits'))
+		if (!property_exists($this, $hitsField))
 		{
 			return true;
 		}
 
-		if (\is_null($pk))
+		if (is_null($pk))
 		{
 			$pk = array();
 
@@ -1414,23 +1240,20 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				$pk[$key] = $this->$key;
 			}
 		}
-		elseif (!\is_array($pk))
+		elseif (!is_array($pk))
 		{
 			$pk = array($this->_tbl_key => $pk);
 		}
 
 		foreach ($this->_tbl_keys as $key)
 		{
-			$pk[$key] = \is_null($pk[$key]) ? $this->$key : $pk[$key];
+			$pk[$key] = is_null($pk[$key]) ? $this->$key : $pk[$key];
 
 			if ($pk[$key] === null)
 			{
 				throw new \UnexpectedValueException('Null primary key not allowed.');
 			}
 		}
-
-		// Get column name.
-		$hitsField = $this->getColumnAlias('hits');
 
 		// Check the row in by primary key.
 		$query = $this->_db->getQuery(true)
@@ -1442,16 +1265,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 
 		// Set table values in the object.
 		$this->hits++;
-
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterHit',
-			[
-				'subject'	=> $this,
-				'pk'		=> $pk,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterHit', $event);
 
 		return true;
 	}
@@ -1471,7 +1284,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function isCheckedOut($with = 0, $against = null)
 	{
 		// Handle the non-static case.
-		if (isset($this) && ($this instanceof Table) && \is_null($against))
+		if (isset($this) && ($this instanceof Table) && is_null($against))
 		{
 			$checkedOutField = $this->getColumnAlias('checked_out');
 			$against = $this->get($checkedOutField);
@@ -1483,23 +1296,16 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			return false;
 		}
 
-		// This last check can only be relied on if tracking session metadata
-		if (Factory::getApplication()->get('session_metadata', true))
-		{
-			$db = Factory::getDbo();
-			$query = $db->getQuery(true)
-				->select('COUNT(userid)')
-				->from($db->quoteName('#__session'))
-				->where($db->quoteName('userid') . ' = ' . (int) $against);
-			$db->setQuery($query);
-			$checkedOut = (boolean) $db->loadResult();
+		$db = \JFactory::getDbo();
+		$query = $db->getQuery(true)
+			->select('COUNT(userid)')
+			->from($db->quoteName('#__session'))
+			->where($db->quoteName('userid') . ' = ' . (int) $against);
+		$db->setQuery($query);
+		$checkedOut = (boolean) $db->loadResult();
 
-			// If a session exists for the user then it is checked out.
-			return $checkedOut;
-		}
-
-		// Assume if we got here that there is a value in the checked out column but it doesn't match the given user
-		return true;
+		// If a session exists for the user then it is checked out.
+		return $checkedOut;
 	}
 
 	/**
@@ -1517,14 +1323,16 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function getNextOrder($where = '')
 	{
 		// Check if there is an ordering field set
-		if (!$this->hasField('ordering'))
+		$orderingField = $this->getColumnAlias('ordering');
+
+		if (!property_exists($this, $orderingField))
 		{
-			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', \get_class($this)));
+			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', get_class($this)));
 		}
 
 		// Get the largest ordering value for a given where clause.
 		$query = $this->_db->getQuery(true)
-			->select('MAX(' . $this->_db->quoteName($this->getColumnAlias('ordering')) . ')')
+			->select('MAX(' . $this->_db->quoteName($orderingField) . ')')
 			->from($this->_tbl);
 
 		if ($where)
@@ -1577,12 +1385,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function reorder($where = '')
 	{
 		// Check if there is an ordering field set
-		if (!$this->hasField('ordering'))
+		$orderingField = $this->getColumnAlias('ordering');
+
+		if (!property_exists($this, $orderingField))
 		{
-			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', \get_class($this)));
+			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', get_class($this)));
 		}
 
-		$quotedOrderingField = $this->_db->quoteName($this->getColumnAlias('ordering'));
+		$quotedOrderingField = $this->_db->quoteName($orderingField);
 
 		$subquery = $this->_db->getQuery(true)
 			->from($this->_tbl)
@@ -1610,36 +1420,11 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 
 		$subquery->where($quotedOrderingField . ' >= 0');
 		$query->where($quotedOrderingField . ' >= 0');
-		$query->innerJoin('(' . (string) $subquery . ') AS sq ');
 
-		foreach ($innerOn as $key)
-		{
-			$query->where($key);
-		}
-
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeReorder',
-			[
-				'subject'	=> $this,
-				'query'		=> $query,
-				'where'		=> $where,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeReorder', $event);
+		$query->innerJoin('(' . (string) $subquery . ') AS sq ON ' . implode(' AND ', $innerOn));
 
 		$this->_db->setQuery($query);
 		$this->_db->execute();
-
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterReorder',
-			[
-				'subject'	=> $this,
-				'where'		=> $where,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterReorder', $event);
 
 		return true;
 	}
@@ -1660,12 +1445,13 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	public function move($delta, $where = '')
 	{
 		// Check if there is an ordering field set
-		if (!$this->hasField('ordering'))
+		$orderingField = $this->getColumnAlias('ordering');
+
+		if (!property_exists($this, $orderingField))
 		{
-			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', \get_class($this)));
+			throw new \UnexpectedValueException(sprintf('%s does not support ordering.', get_class($this)));
 		}
 
-		$orderingField       = $this->getColumnAlias('ordering');
 		$quotedOrderingField = $this->_db->quoteName($orderingField);
 
 		// If the change is none, do nothing.
@@ -1700,21 +1486,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			$query->where($where);
 		}
 
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforeMove',
-			[
-				'subject'	=> $this,
-				'query'		=> $query,
-				'delta'		=> $delta,
-				'where'		=> $where,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforeMove', $event);
-
 		// Select the first row with the criteria.
-		$query->setLimit(1);
-		$this->_db->setQuery($query);
+		$this->_db->setQuery($query, 0, 1);
 		$row = $this->_db->loadObject();
 
 		// If a row is found, move the item.
@@ -1750,18 +1523,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			$this->_db->execute();
 		}
 
-		// Post-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterMove',
-			[
-				'subject'	=> $this,
-				'row'		=> $row,
-				'delta'		=> $delta,
-				'where'		=> $where,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterMove', $event);
-
 		return true;
 	}
 
@@ -1784,28 +1545,16 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		$userId = (int) $userId;
 		$state  = (int) $state;
 
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableBeforePublish',
-			[
-				'subject'	=> $this,
-				'pks'		=> $pks,
-				'state'		=> $state,
-				'userId'	=> $userId,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableBeforePublish', $event);
-
-		if (!\is_null($pks))
+		if (!is_null($pks))
 		{
-			if (!\is_array($pks))
+			if (!is_array($pks))
 			{
 				$pks = array($pks);
 			}
 
 			foreach ($pks as $key => $pk)
 			{
-				if (!\is_array($pk))
+				if (!is_array($pk))
 				{
 					$pks[$key] = array($this->_tbl_key => $pk);
 				}
@@ -1826,7 +1575,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				// We don't have a full primary key - return false
 				else
 				{
-					$this->setError(Text::_('JLIB_DATABASE_ERROR_NO_ROWS_SELECTED'));
+					$this->setError(\JText::_('JLIB_DATABASE_ERROR_NO_ROWS_SELECTED'));
 
 					return false;
 				}
@@ -1846,14 +1595,14 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 				->set($this->_db->quoteName($publishedField) . ' = ' . (int) $state);
 
 			// If publishing, set published date/time if not previously set
-			if ($state && $this->hasField('publish_up') && (int) $this->publish_up == 0)
+			if ($state && property_exists($this, 'publish_up') && (int) $this->publish_up == 0)
 			{
-				$nowDate = $this->_db->quote(Factory::getDate()->toSql());
+				$nowDate = $this->_db->quote(\JFactory::getDate()->toSql());
 				$query->set($this->_db->quoteName($this->getColumnAlias('publish_up')) . ' = ' . $nowDate);
 			}
 
 			// Determine if there is checkin support for the table.
-			if ($this->hasField('checked_out') || $this->hasField('checked_out_time'))
+			if (property_exists($this, 'checked_out') || property_exists($this, 'checked_out_time'))
 			{
 				$query->where(
 					'('
@@ -1886,9 +1635,9 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 			}
 
 			// If checkin is supported and all rows were adjusted, check them in.
-			if ($checkin && (\count($pks) == $this->_db->getAffectedRows()))
+			if ($checkin && (count($pks) == $this->_db->getAffectedRows()))
 			{
-				$this->checkIn($pk);
+				$this->checkin($pk);
 			}
 
 			// If the Table instance value is in the list of primary keys that were set, set the instance.
@@ -1909,18 +1658,6 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 		}
 
 		$this->setError('');
-
-		// Pre-processing by observers
-		$event = AbstractEvent::create(
-			'onTableAfterPublish',
-			[
-				'subject'	=> $this,
-				'pks'		=> $pks,
-				'state'		=> $state,
-				'userId'	=> $userId,
-			]
-		);
-		$this->getDispatcher()->dispatch('onTableAfterPublish', $event);
 
 		return true;
 	}
@@ -1982,7 +1719,7 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	public function setColumnAlias($column, $columnAlias)
 	{
-		// Sanitize the column name alias
+		// Santize the column name alias
 		$column = strtolower($column);
 		$column = preg_replace('#[^A-Z0-9_]#i', '', $column);
 
@@ -1999,11 +1736,8 @@ abstract class Table extends CMSObject implements TableInterface, DispatcherAwar
 	 */
 	protected function _unlock()
 	{
-		if ($this->_locked)
-		{
-			$this->_db->unlockTables();
-			$this->_locked = false;
-		}
+		$this->_db->unlockTables();
+		$this->_locked = false;
 
 		return true;
 	}

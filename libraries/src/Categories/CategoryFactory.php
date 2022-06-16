@@ -2,7 +2,7 @@
 /**
  * Joomla! Content Management System
  *
- * @copyright  (C) 2018 Open Source Matters, Inc. <https://www.joomla.org>
+ * @copyright  Copyright (C) 2005 - 2020 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -21,7 +21,7 @@ class CategoryFactory implements CategoryFactoryInterface
 	 * The namespace to create the categories from.
 	 *
 	 * @var    string
-	 * @since  4.0.0
+	 * @since  3.10.0
 	 */
 	private $namespace;
 
@@ -31,7 +31,7 @@ class CategoryFactory implements CategoryFactoryInterface
 	 *
 	 * @param   string  $namespace  The namespace
 	 *
-	 * @since   4.0.0
+	 * @since   3.10.0
 	 */
 	public function __construct($namespace)
 	{
@@ -50,7 +50,7 @@ class CategoryFactory implements CategoryFactoryInterface
 	 *
 	 * @throws  SectionNotFoundException
 	 */
-	public function createCategory(array $options = [], string $section = ''): CategoryInterface
+	public function createCategory(array $options = array(), $section = '')
 	{
 		$className = trim($this->namespace, '\\') . '\\Site\\Service\\' . ucfirst($section) . 'Category';
 

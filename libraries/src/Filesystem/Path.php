@@ -8,14 +8,17 @@
 
 namespace Joomla\CMS\Filesystem;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Filesystem\Wrapper\PathWrapper;
+use Joomla\CMS\Filesystem\Wrapper\FileWrapper;
 use Joomla\CMS\Crypt\Crypt;
 
-if (!\defined('JPATH_ROOT'))
+if (!defined('JPATH_ROOT'))
 {
 	// Define a string constant for the root directory of the file system in native format
-	\define('JPATH_ROOT', Path::clean(JPATH_SITE));
+	$pathHelper = new PathWrapper;
+	define('JPATH_ROOT', $pathHelper->clean(JPATH_SITE));
 }
 
 /**
@@ -132,7 +135,7 @@ class Path
 		$path = self::clean($path);
 		$mode = @ decoct(@ fileperms($path) & 0777);
 
-		if (\strlen($mode) < 3)
+		if (strlen($mode) < 3)
 		{
 			return '---------';
 		}
@@ -161,8 +164,8 @@ class Path
 	 *
 	 * @return  string  A cleaned version of the path or exit on error.
 	 *
-	 * @throws  \Exception
 	 * @since   1.7.0
+	 * @throws  Exception
 	 */
 	public static function check($path)
 	{
@@ -173,7 +176,8 @@ class Path
 				sprintf(
 					'%s() - Use of relative paths not permitted',
 					__METHOD__
-				)
+				),
+				20
 			);
 		}
 
@@ -186,7 +190,8 @@ class Path
 					'%1$s() - Snooping out of bounds @ %2$s',
 					__METHOD__,
 					self::removeRoot($path)
-				)
+				),
+				20
 			);
 		}
 
@@ -201,18 +206,19 @@ class Path
 	 *
 	 * @return  string  The cleaned path.
 	 *
-	 * @throws  \UnexpectedValueException
 	 * @since   1.7.0
+	 * @throws  UnexpectedValueException
 	 */
 	public static function clean($path, $ds = DIRECTORY_SEPARATOR)
 	{
-		if (!\is_string($path) && !empty($path))
+		if (!is_string($path) && !empty($path))
 		{
 			throw new \UnexpectedValueException(
 				sprintf(
 					'%s() - $path is not a string',
 					__METHOD__
-				)
+				),
+				20
 			);
 		}
 
@@ -224,7 +230,7 @@ class Path
 		}
 		// Remove double slashes and backslashes and convert all slashes and backslashes to DIRECTORY_SEPARATOR
 		// If dealing with a UNC path don't forget to prepend the path with a backslash.
-		elseif (($ds === '\\') && substr($path, 0, 2) === '\\\\')
+		elseif (($ds == '\\') && substr($path, 0, 2) == '\\\\')
 		{
 			$path = "\\" . preg_replace('#[/\\\\]+#', $ds, $path);
 		}
@@ -254,7 +260,7 @@ class Path
 		// Try to find a writable directory
 		$dir = false;
 
-		foreach ([$jtp, $ssp, '/tmp'] as $currentDir)
+		foreach (array($jtp, $ssp, '/tmp') as $currentDir)
 		{
 			if (is_writable($currentDir))
 			{
@@ -266,17 +272,18 @@ class Path
 
 		if ($dir)
 		{
-			$test = $dir . '/' . $tmp;
+			$fileObject = new FileWrapper;
+			$test       = $dir . '/' . $tmp;
 
 			// Create the test file
 			$blank = '';
-			File::write($test, $blank, false);
+			$fileObject->write($test, $blank, false);
 
 			// Test ownership
 			$return = (fileowner($test) == fileowner($path));
 
 			// Delete the test file
-			File::delete($test);
+			$fileObject->delete($test);
 
 			return $return;
 		}
@@ -297,7 +304,7 @@ class Path
 	public static function find($paths, $file)
 	{
 		// Force to array
-		if (!\is_array($paths) && !($paths instanceof \Iterator))
+		if (!is_array($paths) && !($paths instanceof \Iterator))
 		{
 			settype($paths, 'array');
 		}
@@ -315,7 +322,7 @@ class Path
 				// traversal attempts on the local file system.
 
 				// Needed for substr() later
-				$path     = realpath($path);
+				$path = realpath($path);
 				$fullname = realpath($fullname);
 			}
 
@@ -325,7 +332,7 @@ class Path
 			 * non-registered directories are not accessible via directory
 			 * traversal attempts.
 			 */
-			if (file_exists($fullname) && substr($fullname, 0, \strlen($path)) === $path)
+			if (file_exists($fullname) && substr($fullname, 0, strlen($path)) == $path)
 			{
 				return $fullname;
 			}
@@ -352,7 +359,7 @@ class Path
 		// Save start character for absolute path
 		$startCharacter = ($path[0] === DIRECTORY_SEPARATOR) ? DIRECTORY_SEPARATOR : '';
 
-		$parts = [];
+		$parts = array();
 
 		foreach (explode(DIRECTORY_SEPARATOR, $path) as $part)
 		{
@@ -397,15 +404,25 @@ class Path
 			$rootDirectory = JPATH_ROOT;
 		}
 
-		$makePattern = static function ($dir) {
-			return '~' . str_replace('~', '\\~', preg_replace('~[/\\\\]+~', '[/\\\\\\\\]+', $dir)) . '~';
-		};
-
-		$replacements = [
-			$makePattern(static::clean($rootDirectory)) => '[ROOT]',
-			$makePattern(sys_get_temp_dir())            => '[TMP]',
-		];
+		$replacements = array(
+			self::makePattern(static::clean($rootDirectory)) => '[ROOT]',
+			self::makePattern(sys_get_temp_dir())            => '[TMP]',
+		);
 
 		return preg_replace(array_keys($replacements), array_values($replacements), $message);
+	}
+
+	/**
+	 * Turn directory separators into match classes
+	 *
+	 * @param   string  $dir  A directory name
+	 *
+	 * @return  string
+	 *
+	 * @since   3.10.7
+	 */
+	private static function makePattern($dir)
+	{
+		return '~' . str_replace('~', '\\~', preg_replace('~[/\\\\]+~', '[/\\\\\\\\]+', $dir)) . '~';
 	}
 }

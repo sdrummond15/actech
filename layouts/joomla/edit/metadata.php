@@ -9,8 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Language\Text;
-
 $form = $displayData->getForm();
 
 // JLayout for standard handling of metadata fields in the administrator content edit screens.
@@ -19,10 +17,7 @@ $fieldSets = $form->getFieldsets('metadata');
 
 <?php foreach ($fieldSets as $name => $fieldSet) : ?>
 	<?php if (isset($fieldSet->description) && trim($fieldSet->description)) : ?>
-		<div class="alert alert-info">
-			<span class="icon-info-circle" aria-hidden="true"></span><span class="visually-hidden"><?php echo Text::_('INFO'); ?></span>
-			<?php echo $this->escape(Text::_($fieldSet->description)); ?>
-		</div>
+		<p class="alert alert-info"><?php echo $this->escape(JText::_($fieldSet->description)); ?></p>
 	<?php endif; ?>
 
 	<?php
@@ -31,6 +26,7 @@ $fieldSets = $form->getFieldsets('metadata');
 	{
 		echo $form->renderField('metadesc');
 		echo $form->renderField('metakey');
+		echo $form->renderField('xreference');
 	}
 
 	foreach ($form->getFieldset($name) as $field)

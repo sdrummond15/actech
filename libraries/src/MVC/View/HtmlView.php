@@ -8,24 +8,41 @@
 
 namespace Joomla\CMS\MVC\View;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Event\AbstractEvent;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Path;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Uri\Uri;
+defined('JPATH_PLATFORM') or die;
 
 /**
- * Base class for a Joomla Html View
+ * Base class for a Joomla View
  *
  * Class holding methods for displaying presentation data.
  *
  * @since  2.5.5
  */
-class HtmlView extends AbstractView
+class HtmlView extends \JObject
 {
+	/**
+	 * The active document object
+	 *
+	 * @var    \JDocument
+	 * @since  3.0
+	 */
+	public $document;
+
+	/**
+	 * The name of the view
+	 *
+	 * @var    array
+	 * @since  3.0
+	 */
+	protected $_name = null;
+
+	/**
+	 * Registered models
+	 *
+	 * @var    array
+	 * @since  3.0
+	 */
+	protected $_models = array();
+
 	/**
 	 * The base path of the view
 	 *
@@ -33,6 +50,14 @@ class HtmlView extends AbstractView
 	 * @since  3.0
 	 */
 	protected $_basePath = null;
+
+	/**
+	 * The default model
+	 *
+	 * @var	   string
+	 * @since  3.0
+	 */
+	protected $_defaultModel = null;
 
 	/**
 	 * Layout name
@@ -83,6 +108,15 @@ class HtmlView extends AbstractView
 	protected $_output = null;
 
 	/**
+	 * Callback for escaping.
+	 *
+	 * @var    string
+	 * @since  3.0
+	 * @deprecated  3.0
+	 */
+	protected $_escape = 'htmlspecialchars';
+
+	/**
 	 * Charset to use in escaping mechanisms; defaults to urf8 (UTF-8)
 	 *
 	 * @var    string
@@ -106,20 +140,34 @@ class HtmlView extends AbstractView
 	 */
 	public function __construct($config = array())
 	{
-		parent::__construct($config);
+		// Set the view name
+		if (empty($this->_name))
+		{
+			if (array_key_exists('name', $config))
+			{
+				$this->_name = $config['name'];
+			}
+			else
+			{
+				$this->_name = $this->getName();
+			}
+		}
 
 		// Set the charset (used by the variable escaping functions)
-		if (\array_key_exists('charset', $config))
+		if (array_key_exists('charset', $config))
 		{
-			@trigger_error(
-				'Setting a custom charset for escaping is deprecated. Override \JViewLegacy::escape() instead.',
-				E_USER_DEPRECATED
-			);
+			\JLog::add('Setting a custom charset for escaping is deprecated. Override \JViewLegacy::escape() instead.', \JLog::WARNING, 'deprecated');
 			$this->_charset = $config['charset'];
 		}
 
+		// User-defined escaping callback
+		if (array_key_exists('escape', $config))
+		{
+			$this->setEscape($config['escape']);
+		}
+
 		// Set a base path for use by the view
-		if (\array_key_exists('base_path', $config))
+		if (array_key_exists('base_path', $config))
 		{
 			$this->_basePath = $config['base_path'];
 		}
@@ -129,34 +177,22 @@ class HtmlView extends AbstractView
 		}
 
 		// Set the default template search path
-		if (\array_key_exists('template_path', $config))
+		if (array_key_exists('template_path', $config))
 		{
 			// User-defined dirs
 			$this->_setPath('template', $config['template_path']);
 		}
-		elseif (is_dir($this->_basePath . '/tmpl/' . $this->getName()))
-		{
-			$this->_setPath('template', $this->_basePath . '/tmpl/' . $this->getName());
-		}
-		elseif (is_dir($this->_basePath . '/View/' . $this->getName() . '/tmpl'))
-		{
-			$this->_setPath('template', $this->_basePath . '/View/' . $this->getName() . '/tmpl');
-		}
-		elseif (is_dir($this->_basePath . '/view/' . $this->getName() . '/tmpl'))
+		elseif (is_dir($this->_basePath . '/view'))
 		{
 			$this->_setPath('template', $this->_basePath . '/view/' . $this->getName() . '/tmpl');
 		}
-		elseif (is_dir($this->_basePath . '/views/' . $this->getName() . '/tmpl'))
+		else
 		{
 			$this->_setPath('template', $this->_basePath . '/views/' . $this->getName() . '/tmpl');
 		}
-		else
-		{
-			$this->_setPath('template', $this->_basePath . '/views/' . $this->getName());
-		}
 
 		// Set the default helper search path
-		if (\array_key_exists('helper_path', $config))
+		if (array_key_exists('helper_path', $config))
 		{
 			// User-defined dirs
 			$this->_setPath('helper', $config['helper_path']);
@@ -167,7 +203,7 @@ class HtmlView extends AbstractView
 		}
 
 		// Set the layout
-		if (\array_key_exists('layout', $config))
+		if (array_key_exists('layout', $config))
 		{
 			$this->setLayout($config['layout']);
 		}
@@ -176,7 +212,7 @@ class HtmlView extends AbstractView
 			$this->setLayout('default');
 		}
 
-		$this->baseurl = Uri::base(true);
+		$this->baseurl = \JUri::base(true);
 	}
 
 	/**
@@ -184,81 +220,237 @@ class HtmlView extends AbstractView
 	 *
 	 * @param   string  $tpl  The name of the template file to parse; automatically searches through the template paths.
 	 *
-	 * @return  void
+	 * @return  mixed  A string if successful, otherwise an Error object.
 	 *
-	 * @throws  \Exception
 	 * @see     \JViewLegacy::loadTemplate()
 	 * @since   3.0
 	 */
 	public function display($tpl = null)
 	{
-		$app = Factory::getApplication();
-
-		if ($this->option)
-		{
-			$component = $this->option;
-		}
-		else
-		{
-			$component = ApplicationHelper::getComponentName();
-		}
-
-		$context = $component . '.' . $this->getName();
-
-		$app->getDispatcher()->dispatch(
-			'onBeforeDisplay',
-			AbstractEvent::create(
-				'onBeforeDisplay',
-				[
-					'eventClass' => 'Joomla\CMS\Event\View\DisplayEvent',
-					'subject'    => $this,
-					'extension'  => $context
-				]
-			)
-		);
-
 		$result = $this->loadTemplate($tpl);
 
-		$eventResult = $app->getDispatcher()->dispatch(
-			'onAfterDisplay',
-			AbstractEvent::create(
-				'onAfterDisplay',
-				[
-					'eventClass' => 'Joomla\CMS\Event\View\DisplayEvent',
-					'subject'    => $this,
-					'extension'  => $context,
-					'source'     => $result
-				]
-			)
-		);
-
-		$eventResult->getArgument('used', false);
+		if ($result instanceof \Exception)
+		{
+			return $result;
+		}
 
 		echo $result;
 	}
 
 	/**
+	 * Assigns variables to the view script via differing strategies.
+	 *
+	 * This method is overloaded; you can assign all the properties of
+	 * an object, an associative array, or a single value by name.
+	 *
+	 * You are not allowed to set variables that begin with an underscore;
+	 * these are either private properties for \JView or private variables
+	 * within the template script itself.
+	 *
+	 * <code>
+	 * $view = new \Joomla\CMS\View\HtmlView;
+	 *
+	 * // Assign directly
+	 * $view->var1 = 'something';
+	 * $view->var2 = 'else';
+	 *
+	 * // Assign by name and value
+	 * $view->assign('var1', 'something');
+	 * $view->assign('var2', 'else');
+	 *
+	 * // Assign by assoc-array
+	 * $ary = array('var1' => 'something', 'var2' => 'else');
+	 * $view->assign($obj);
+	 *
+	 * // Assign by object
+	 * $obj = new \stdClass;
+	 * $obj->var1 = 'something';
+	 * $obj->var2 = 'else';
+	 * $view->assign($obj);
+	 *
+	 * </code>
+	 *
+	 * @return  boolean  True on success, false on failure.
+	 *
+	 * @since   3.0
+	 * @deprecated  3.0 Use native PHP syntax.
+	 */
+	public function assign()
+	{
+		\JLog::add(__METHOD__ . ' is deprecated. Use native PHP syntax.', \JLog::WARNING, 'deprecated');
+
+		// Get the arguments; there may be 1 or 2.
+		$arg0 = @func_get_arg(0);
+		$arg1 = @func_get_arg(1);
+
+		// Assign by object
+		if (is_object($arg0))
+		{
+			// Assign public properties
+			foreach (get_object_vars($arg0) as $key => $val)
+			{
+				if (strpos($key, '_') !== 0)
+				{
+					$this->$key = $val;
+				}
+			}
+
+			return true;
+		}
+
+		// Assign by associative array
+		if (is_array($arg0))
+		{
+			foreach ($arg0 as $key => $val)
+			{
+				if (strpos($key, '_') !== 0)
+				{
+					$this->$key = $val;
+				}
+			}
+
+			return true;
+		}
+
+		// Assign by string name and mixed value.
+
+		// We use array_key_exists() instead of isset() because isset()
+		// fails if the value is set to null.
+		if (is_string($arg0) && strpos($arg0, '_') !== 0 && func_num_args() > 1)
+		{
+			$this->$arg0 = $arg1;
+
+			return true;
+		}
+
+		// $arg0 was not object, array, or string.
+		return false;
+	}
+
+	/**
+	 * Assign variable for the view (by reference).
+	 *
+	 * You are not allowed to set variables that begin with an underscore;
+	 * these are either private properties for \JView or private variables
+	 * within the template script itself.
+	 *
+	 * <code>
+	 * $view = new \JView;
+	 *
+	 * // Assign by name and value
+	 * $view->assignRef('var1', $ref);
+	 *
+	 * // Assign directly
+	 * $view->var1 = &$ref;
+	 * </code>
+	 *
+	 * @param   string  $key   The name for the reference in the view.
+	 * @param   mixed   &$val  The referenced variable.
+	 *
+	 * @return  boolean  True on success, false on failure.
+	 *
+	 * @since   3.0
+	 * @deprecated  3.0  Use native PHP syntax.
+	 */
+	public function assignRef($key, &$val)
+	{
+		\JLog::add(__METHOD__ . ' is deprecated. Use native PHP syntax.', \JLog::WARNING, 'deprecated');
+
+		if (is_string($key) && strpos($key, '_') !== 0)
+		{
+			$this->$key = &$val;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Escapes a value for output in a view script.
 	 *
-	 * If escaping mechanism is htmlspecialchars, use
-	 * {@link $_charset} setting.
+	 * If escaping mechanism is either htmlspecialchars or htmlentities, uses
+	 * {@link $_encoding} setting.
 	 *
 	 * @param   mixed  $var  The output to escape.
 	 *
 	 * @return  mixed  The escaped value.
 	 *
-	 * @note the ENT_COMPAT flag was replaced by ENT_QUOTES in Joomla 4.0 to also escape single quotes
+	 * @note the ENT_COMPAT flag will be replaced by ENT_QUOTES in Joomla 4.0 to also escape single quotes
 	 *
 	 * @since   3.0
 	 */
 	public function escape($var)
 	{
-		if ($var === null)
+		if (in_array($this->_escape, array('htmlspecialchars', 'htmlentities')))
 		{
-			return '';
+			return call_user_func($this->_escape, $var, ENT_COMPAT, $this->_charset);
 		}
 
-		return htmlspecialchars($var, ENT_QUOTES, $this->_charset);
+		return call_user_func($this->_escape, $var);
+	}
+
+	/**
+	 * Method to get data from a registered model or a property of the view
+	 *
+	 * @param   string  $property  The name of the method to call on the model or the property to get
+	 * @param   string  $default   The name of the model to reference or the default value [optional]
+	 *
+	 * @return  mixed  The return value of the method
+	 *
+	 * @since   3.0
+	 */
+	public function get($property, $default = null)
+	{
+		// If $model is null we use the default model
+		if ($default === null)
+		{
+			$model = $this->_defaultModel;
+		}
+		else
+		{
+			$model = strtolower($default);
+		}
+
+		// First check to make sure the model requested exists
+		if (isset($this->_models[$model]))
+		{
+			// Model exists, let's build the method name
+			$method = 'get' . ucfirst($property);
+
+			// Does the method exist?
+			if (method_exists($this->_models[$model], $method))
+			{
+				// The method exists, let's call it and return what we get
+				$result = $this->_models[$model]->$method();
+
+				return $result;
+			}
+		}
+
+		// Degrade to \JObject::get
+		$result = parent::get($property, $default);
+
+		return $result;
+	}
+
+	/**
+	 * Method to get the model object
+	 *
+	 * @param   string  $name  The name of the model (optional)
+	 *
+	 * @return  mixed  \JModelLegacy object
+	 *
+	 * @since   3.0
+	 */
+	public function getModel($name = null)
+	{
+		if ($name === null)
+		{
+			$name = $this->_defaultModel;
+		}
+
+		return $this->_models[strtolower($name)];
 	}
 
 	/**
@@ -283,6 +475,62 @@ class HtmlView extends AbstractView
 	public function getLayoutTemplate()
 	{
 		return $this->_layoutTemplate;
+	}
+
+	/**
+	 * Method to get the view name
+	 *
+	 * The model name by default parsed using the classname, or it can be set
+	 * by passing a $config['name'] in the class constructor
+	 *
+	 * @return  string  The name of the model
+	 *
+	 * @since   3.0
+	 * @throws  \Exception
+	 */
+	public function getName()
+	{
+		if (empty($this->_name))
+		{
+			$classname = get_class($this);
+			$viewpos = strpos($classname, 'View');
+
+			if ($viewpos === false)
+			{
+				throw new \Exception(\JText::_('JLIB_APPLICATION_ERROR_VIEW_GET_NAME'), 500);
+			}
+
+			$this->_name = strtolower(substr($classname, $viewpos + 4));
+		}
+
+		return $this->_name;
+	}
+
+	/**
+	 * Method to add a model to the view.  We support a multiple model single
+	 * view system by which models are referenced by classname.  A caveat to the
+	 * classname referencing is that any classname prepended by \JModel will be
+	 * referenced by the name without \JModel, eg. \JModelCategory is just
+	 * Category.
+	 *
+	 * @param   \JModelLegacy  $model    The model to add to the view.
+	 * @param   boolean        $default  Is this the default model?
+	 *
+	 * @return  \JModelLegacy  The added model.
+	 *
+	 * @since   3.0
+	 */
+	public function setModel($model, $default = false)
+	{
+		$name = strtolower($model->getName());
+		$this->_models[$name] = $model;
+
+		if ($default)
+		{
+			$this->_defaultModel = $name;
+		}
+
+		return $model;
 	}
 
 	/**
@@ -337,6 +585,23 @@ class HtmlView extends AbstractView
 	}
 
 	/**
+	 * Sets the _escape() callback.
+	 *
+	 * @param   mixed  $spec  The callback for _escape() to use.
+	 *
+	 * @return  void
+	 *
+	 * @since   3.0
+	 * @deprecated  3.0  Override \JViewLegacy::escape() instead.
+	 */
+	public function setEscape($spec)
+	{
+		\JLog::add(__METHOD__ . ' is deprecated. Override \JViewLegacy::escape() instead.', \JLog::WARNING, 'deprecated');
+
+		$this->_escape = $spec;
+	}
+
+	/**
 	 * Adds to the stack of view script paths in LIFO order.
 	 *
 	 * @param   mixed  $path  A directory path or an array of paths.
@@ -379,7 +644,7 @@ class HtmlView extends AbstractView
 		// Clear prior output
 		$this->_output = null;
 
-		$template = Factory::getApplication()->getTemplate(true);
+		$template = \JFactory::getApplication()->getTemplate();
 		$layout = $this->getLayout();
 		$layoutTemplate = $this->getLayoutTemplate();
 
@@ -391,30 +656,30 @@ class HtmlView extends AbstractView
 		$tpl = isset($tpl) ? preg_replace('/[^A-Z0-9_\.-]/i', '', $tpl) : $tpl;
 
 		// Load the language file for the template
-		$lang = Factory::getLanguage();
-		$lang->load('tpl_' . $template->template, JPATH_BASE)
-			|| $lang->load('tpl_' . $template->parent, JPATH_THEMES . '/' . $template->parent)
-			|| $lang->load('tpl_' . $template->template, JPATH_THEMES . '/' . $template->template);
+		$lang = \JFactory::getLanguage();
+		$lang->load('tpl_' . $template, JPATH_BASE, null, false, true)
+			|| $lang->load('tpl_' . $template, JPATH_THEMES . "/$template", null, false, true);
 
 		// Change the template folder if alternative layout is in different template
-		if (isset($layoutTemplate) && $layoutTemplate !== '_' && $layoutTemplate != $template->template)
+		if (isset($layoutTemplate) && $layoutTemplate !== '_' && $layoutTemplate != $template)
 		{
 			$this->_path['template'] = str_replace(
-				JPATH_THEMES . DIRECTORY_SEPARATOR . $template->template,
+				JPATH_THEMES . DIRECTORY_SEPARATOR . $template,
 				JPATH_THEMES . DIRECTORY_SEPARATOR . $layoutTemplate,
 				$this->_path['template']
 			);
 		}
 
 		// Load the template script
+		jimport('joomla.filesystem.path');
 		$filetofind = $this->_createFileName('template', array('name' => $file));
-		$this->_template = Path::find($this->_path['template'], $filetofind);
+		$this->_template = \JPath::find($this->_path['template'], $filetofind);
 
 		// If alternate layout can't be found, fall back to default layout
 		if ($this->_template == false)
 		{
 			$filetofind = $this->_createFileName('', array('name' => 'default' . (isset($tpl) ? '_' . $tpl : $tpl)));
-			$this->_template = Path::find($this->_path['template'], $filetofind);
+			$this->_template = \JPath::find($this->_path['template'], $filetofind);
 		}
 
 		if ($this->_template != false)
@@ -442,8 +707,10 @@ class HtmlView extends AbstractView
 
 			return $this->_output;
 		}
-
-		throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_LAYOUTFILE_NOT_FOUND', $file), 500);
+		else
+		{
+			throw new \Exception(\JText::sprintf('JLIB_APPLICATION_ERROR_LAYOUTFILE_NOT_FOUND', $file), 500);
+		}
 	}
 
 	/**
@@ -461,7 +728,8 @@ class HtmlView extends AbstractView
 		$file = preg_replace('/[^A-Z0-9_\.-]/i', '', $hlp);
 
 		// Load the template script
-		$helper = Path::find($this->_path['helper'], $this->_createFileName('helper', array('name' => $file)));
+		jimport('joomla.filesystem.path');
+		$helper = \JPath::find($this->_path['helper'], $this->_createFileName('helper', array('name' => $file)));
 
 		if ($helper != false)
 		{
@@ -482,25 +750,14 @@ class HtmlView extends AbstractView
 	 */
 	protected function _setPath($type, $path)
 	{
-		if ($this->option)
-		{
-			$component = $this->option;
-		}
-		else
-		{
-			$component = ApplicationHelper::getComponentName();
-		}
-
-		$app = Factory::getApplication();
+		$component = \JApplicationHelper::getComponentName();
+		$app = \JFactory::getApplication();
 
 		// Clear out the prior search dirs
 		$this->_path[$type] = array();
 
 		// Actually add the user-specified directories
 		$this->_addPath($type, $path);
-
-		// Get the active template object
-		$template = $app->getTemplate(true);
 
 		// Always add the fallback directories as last resort
 		switch (strtolower($type))
@@ -509,25 +766,9 @@ class HtmlView extends AbstractView
 				// Set the alternative template search dir
 				if (isset($app))
 				{
-					if ($component)
-					{
-						$component = preg_replace('/[^A-Z0-9_\.-]/i', '', $component);
-					}
-
-					$name = $this->getName();
-
-					if (!empty($template->parent))
-					{
-						// Parent template's overrides
-						$this->_addPath('template', JPATH_THEMES . '/' . $template->parent . '/html/' . $component . '/' . $name);
-
-						// Child template's overrides
-						$this->_addPath('template', JPATH_THEMES . '/' . $template->template . '/html/' . $component . '/' . $name);
-
-						break;
-					}
-
-					$this->_addPath('template', JPATH_THEMES . '/' . $template->template . '/html/' . $component . '/' . $name);
+					$component = preg_replace('/[^A-Z0-9_\.-]/i', '', $component);
+					$fallback = JPATH_THEMES . '/' . $app->getTemplate() . '/html/' . $component . '/' . $this->getName();
+					$this->_addPath('template', $fallback);
 				}
 				break;
 		}
@@ -545,14 +786,16 @@ class HtmlView extends AbstractView
 	 */
 	protected function _addPath($type, $path)
 	{
+		jimport('joomla.filesystem.path');
+
 		// Loop through the path directories
 		foreach ((array) $path as $dir)
 		{
 			// Clean up the path
-			$dir = Path::clean($dir);
+			$dir = \JPath::clean($dir);
 
 			// Add trailing separators as needed
-			if (substr($dir, -1) !== DIRECTORY_SEPARATOR)
+			if (substr($dir, -1) != DIRECTORY_SEPARATOR)
 			{
 				// Directory
 				$dir .= DIRECTORY_SEPARATOR;
@@ -598,7 +841,7 @@ class HtmlView extends AbstractView
 	 */
 	public function getForm()
 	{
-		if (!\is_object($this->form))
+		if (!is_object($this->form))
 		{
 			$this->form = $this->get('Form');
 		}
@@ -617,7 +860,7 @@ class HtmlView extends AbstractView
 	 */
 	public function setDocumentTitle($title)
 	{
-		$app = Factory::getApplication();
+		$app = \JFactory::getApplication();
 
 		// Check for empty title and add site name if param is set
 		if (empty($title))
@@ -626,11 +869,11 @@ class HtmlView extends AbstractView
 		}
 		elseif ($app->get('sitename_pagetitles', 0) == 1)
 		{
-			$title = Text::sprintf('JPAGETITLE', $app->get('sitename'), $title);
+			$title = \JText::sprintf('JPAGETITLE', $app->get('sitename'), $title);
 		}
 		elseif ($app->get('sitename_pagetitles', 0) == 2)
 		{
-			$title = Text::sprintf('JPAGETITLE', $title, $app->get('sitename'));
+			$title = \JText::sprintf('JPAGETITLE', $title, $app->get('sitename'));
 		}
 
 		$this->document->setTitle($title);

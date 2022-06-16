@@ -8,9 +8,8 @@
 
 namespace Joomla\CMS;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Date\Date;
 use Joomla\CMS\Helper\LibraryHelper;
 
 /**
@@ -34,7 +33,7 @@ final class Version
 	 * @var    integer
 	 * @since  3.8.0
 	 */
-	const MAJOR_VERSION = 4;
+	const MAJOR_VERSION = 3;
 
 	/**
 	 * Minor release version.
@@ -42,7 +41,7 @@ final class Version
 	 * @var    integer
 	 * @since  3.8.0
 	 */
-	const MINOR_VERSION = 1;
+	const MINOR_VERSION = 10;
 
 	/**
 	 * Patch release version.
@@ -50,7 +49,7 @@ final class Version
 	 * @var    integer
 	 * @since  3.8.0
 	 */
-	const PATCH_VERSION = 4;
+	const PATCH_VERSION = 9;
 
 	/**
 	 * Extra release version info.
@@ -64,6 +63,24 @@ final class Version
 	const EXTRA_VERSION = '';
 
 	/**
+	 * Release version.
+	 *
+	 * @var    string
+	 * @since  3.5
+	 * @deprecated  4.0  Use separated version constants instead
+	 */
+	const RELEASE = '3.10';
+
+	/**
+	 * Maintenance version.
+	 *
+	 * @var    string
+	 * @since  3.5
+	 * @deprecated  4.0  Use separated version constants instead
+	 */
+	const DEV_LEVEL = '9';
+
+	/**
 	 * Development status.
 	 *
 	 * @var    string
@@ -72,12 +89,21 @@ final class Version
 	const DEV_STATUS = 'Stable';
 
 	/**
+	 * Build number.
+	 *
+	 * @var    string
+	 * @since  3.5
+	 * @deprecated  4.0
+	 */
+	const BUILD = '';
+
+	/**
 	 * Code name.
 	 *
 	 * @var    string
 	 * @since  3.5
 	 */
-	const CODENAME = 'Kuamini';
+	const CODENAME = 'Daraja';
 
 	/**
 	 * Release date.
@@ -85,7 +111,7 @@ final class Version
 	 * @var    string
 	 * @since  3.5
 	 */
-	const RELDATE = '24-May-2022';
+	const RELDATE = '7-May-2022';
 
 	/**
 	 * Release time.
@@ -93,7 +119,7 @@ final class Version
 	 * @var    string
 	 * @since  3.5
 	 */
-	const RELTIME = '16:00';
+	const RELTIME = '17:02';
 
 	/**
 	 * Release timezone.
@@ -120,13 +146,43 @@ final class Version
 	const URL = '<a href="https://www.joomla.org">Joomla!</a> is Free Software released under the GNU General Public License.';
 
 	/**
+	 * Magic getter providing access to constants previously defined as class member vars.
+	 *
+	 * @param   string  $name  The name of the property.
+	 *
+	 * @return  mixed   A value if the property name is valid.
+	 *
+	 * @since   3.5
+	 * @deprecated  4.0  Access the constants directly
+	 */
+	public function __get($name)
+	{
+		if (defined("JVersion::$name"))
+		{
+			\JLog::add(
+				'Accessing Version data through class member variables is deprecated, use the corresponding constant instead.',
+				\JLog::WARNING,
+				'deprecated'
+			);
+
+			return constant("\\Joomla\\CMS\\Version::$name");
+		}
+
+		$trace = debug_backtrace();
+		trigger_error(
+			'Undefined constant via __get(): ' . $name . ' in ' . $trace[0]['file'] . ' on line ' . $trace[0]['line'],
+			E_USER_NOTICE
+		);
+	}
+
+	/**
 	 * Check if we are in development mode
 	 *
 	 * @return  boolean
 	 *
 	 * @since   3.4.3
 	 */
-	public function isInDevelopmentState(): bool
+	public function isInDevelopmentState()
 	{
 		return strtolower(self::DEV_STATUS) !== 'stable';
 	}
@@ -141,7 +197,7 @@ final class Version
 	 * @link    https://www.php.net/version_compare
 	 * @since   1.0
 	 */
-	public function isCompatible(string $minimum): bool
+	public function isCompatible($minimum)
 	{
 		return version_compare(JVERSION, $minimum, 'ge');
 	}
@@ -153,7 +209,7 @@ final class Version
 	 *
 	 * @since   1.0
 	 */
-	public function getHelpVersion(): string
+	public function getHelpVersion()
 	{
 		return '.' . self::MAJOR_VERSION . self::MINOR_VERSION;
 	}
@@ -165,13 +221,16 @@ final class Version
 	 *
 	 * @since   1.5
 	 */
-	public function getShortVersion(): string
+	public function getShortVersion()
 	{
 		$version = self::MAJOR_VERSION . '.' . self::MINOR_VERSION . '.' . self::PATCH_VERSION;
 
-		if (!empty(self::EXTRA_VERSION))
+		// Has to be assigned to a variable to support PHP 5.3 and 5.4
+		$extraVersion = self::EXTRA_VERSION;
+
+		if (!empty($extraVersion))
 		{
-			$version .= '-' . self::EXTRA_VERSION;
+			$version .= '-' . $extraVersion;
 		}
 
 		return $version;
@@ -184,7 +243,7 @@ final class Version
 	 *
 	 * @since   1.5
 	 */
-	public function getLongVersion(): string
+	public function getLongVersion()
 	{
 		return self::PRODUCT . ' ' . $this->getShortVersion() . ' '
 			. self::DEV_STATUS . ' [ ' . self::CODENAME . ' ] ' . self::RELDATE . ' '
@@ -202,20 +261,27 @@ final class Version
 	 *
 	 * @since   1.0
 	 */
-	public function getUserAgent(string $suffix = '', bool $mask = false, bool $addVersion = true): string
+	public function getUserAgent($suffix = null, $mask = false, $addVersion = true)
 	{
-		if ($suffix === '')
+		if ($suffix === null)
 		{
 			$suffix = 'Framework';
 		}
 
 		if ($addVersion)
 		{
-			$suffix .= '/' . self::MAJOR_VERSION . '.' . self::MINOR_VERSION;
+			$suffix .= '/' . self::RELEASE;
 		}
 
 		// If masked pretend to look like Mozilla 5.0 but still identify ourselves.
-		return ($mask ? 'Mozilla/5.0 ' : '') . self::PRODUCT . '/' . $this->getShortVersion() . ($suffix ? ' ' . $suffix : '');
+		if ($mask)
+		{
+			return 'Mozilla/5.0 ' . self::PRODUCT . '/' . self::RELEASE . '.' . self::DEV_LEVEL . ($suffix ? ' ' . $suffix : '');
+		}
+		else
+		{
+			return self::PRODUCT . '/' . self::RELEASE . '.' . self::DEV_LEVEL . ($suffix ? ' ' . $suffix : '');
+		}
 	}
 
 	/**
@@ -226,9 +292,11 @@ final class Version
 	 *
 	 * @since   3.2
 	 */
-	public function generateMediaVersion(): string
+	public function generateMediaVersion()
 	{
-		return md5($this->getLongVersion() . Factory::getApplication()->get('secret') . (new Date)->toSql());
+		$date = new \JDate;
+
+		return md5($this->getLongVersion() . \JFactory::getConfig()->get('secret') . $date->toSql());
 	}
 
 	/**
@@ -242,15 +310,18 @@ final class Version
 	 *
 	 * @since   3.2
 	 */
-	public function getMediaVersion(): string
+	public function getMediaVersion()
 	{
 		// Load the media version and cache it for future use
 		static $mediaVersion = null;
 
 		if ($mediaVersion === null)
 		{
-			// Get the joomla library params and the media version
-			$mediaVersion = LibraryHelper::getParams('joomla')->get('mediaversion', '');
+			// Get the joomla library params
+			$params = LibraryHelper::getParams('joomla');
+
+			// Get the media version
+			$mediaVersion = $params->get('mediaversion', '');
 
 			// Refresh assets in debug mode or when the media version is not set
 			if (JDEBUG || empty($mediaVersion))
@@ -271,9 +342,11 @@ final class Version
 	 *
 	 * @since   3.2
 	 */
-	public function refreshMediaVersion(): Version
+	public function refreshMediaVersion()
 	{
-		return $this->setMediaVersion($this->generateMediaVersion());
+		$newMediaVersion = $this->generateMediaVersion();
+
+		return $this->setMediaVersion($newMediaVersion);
 	}
 
 	/**
@@ -285,18 +358,17 @@ final class Version
 	 *
 	 * @since   3.2
 	 */
-	public function setMediaVersion(string $mediaVersion): Version
+	public function setMediaVersion($mediaVersion)
 	{
 		// Do not allow empty media versions
 		if (!empty($mediaVersion))
 		{
-			// Get the params ...
+			// Get library parameters
 			$params = LibraryHelper::getParams('joomla');
 
-			// ... set the media version ...
 			$params->set('mediaversion', $mediaVersion);
 
-			// ... and save the modified params
+			// Save modified params
 			LibraryHelper::saveParams('joomla', $params);
 		}
 

@@ -8,14 +8,7 @@
 
 namespace Joomla\CMS\MVC\View;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Document\Feed\FeedItem;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Helper\RouteHelper;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Router\Route;
-use Joomla\CMS\UCM\UCMType;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Base feed View class for a category
@@ -29,37 +22,36 @@ class CategoryFeedView extends HtmlView
 	 *
 	 * @param   string  $tpl  The name of the template file to parse; automatically searches through the template paths.
 	 *
-	 * @return  void
+	 * @return  mixed  A string if successful, otherwise an Error object.
 	 *
 	 * @since   3.2
-	 * @throws  \Exception
 	 */
 	public function display($tpl = null)
 	{
-		$app      = Factory::getApplication();
-		$document = Factory::getDocument();
+		$app      = \JFactory::getApplication();
+		$document = \JFactory::getDocument();
 
 		$extension      = $app->input->getString('option');
 		$contentType = $extension . '.' . $this->viewName;
 
-		$ucmType = new UCMType;
+		$ucmType = new \JUcmType;
 		$ucmRow = $ucmType->getTypeByAlias($contentType);
 		$ucmMapCommon = json_decode($ucmRow->field_mappings)->common;
 		$createdField = null;
 		$titleField = null;
 
-		if (\is_object($ucmMapCommon))
+		if (is_object($ucmMapCommon))
 		{
 			$createdField = $ucmMapCommon->core_created_time;
 			$titleField = $ucmMapCommon->core_title;
 		}
-		elseif (\is_array($ucmMapCommon))
+		elseif (is_array($ucmMapCommon))
 		{
 			$createdField = $ucmMapCommon[0]->core_created_time;
 			$titleField = $ucmMapCommon[0]->core_title;
 		}
 
-		$document->link = Route::_(RouteHelper::getCategoryRoute($app->input->getInt('id'), $language = 0, $extension));
+		$document->link = \JRoute::_(\JHelperRoute::getCategoryRoute($app->input->getInt('id'), $language = 0, $extension));
 
 		$app->input->set('limit', $app->get('feed_limit'));
 		$siteEmail        = $app->get('mailfrom');
@@ -79,7 +71,7 @@ class CategoryFeedView extends HtmlView
 		// Don't display feed if category id missing or non existent
 		if ($category == false || $category->alias === 'root')
 		{
-			throw new \Exception(Text::_('JGLOBAL_CATEGORY_NOT_FOUND'), 404);
+			return \JError::raiseError(404, \JText::_('JGLOBAL_CATEGORY_NOT_FOUND'));
 		}
 
 		foreach ($items as $item)
@@ -98,8 +90,8 @@ class CategoryFeedView extends HtmlView
 			}
 
 			// URL link to article
-			$router = new RouteHelper;
-			$link   = Route::_($router->getRoute($item->id, $contentType, null, null, $item->catid));
+			$router = new \JHelperRoute;
+			$link   = \JRoute::_($router->getRoute($item->id, $contentType, null, null, $item->catid));
 
 			// Strip HTML from feed item description text.
 			$description   = $item->description;
@@ -116,7 +108,7 @@ class CategoryFeedView extends HtmlView
 			}
 
 			// Load individual item creator class.
-			$feeditem              = new FeedItem;
+			$feeditem              = new \JFeedItem;
 			$feeditem->title       = $title;
 			$feeditem->link        = $link;
 			$feeditem->description = $description;

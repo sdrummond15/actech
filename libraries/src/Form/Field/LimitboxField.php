@@ -8,16 +8,18 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Language\Text;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('list');
 
 /**
- * Field to load a list of possible item count limits
+ * Field to load a list of posible item count limits
  *
  * @since  3.2
  */
-class LimitboxField extends ListField
+class LimitboxField extends \JFormFieldList
 {
 	/**
 	 * The form field type.
@@ -96,7 +98,7 @@ class LimitboxField extends ListField
 				{
 					$options[] = (object) array(
 						'value' => $value,
-						'text' => ($value != 0) ? Text::_('J' . $value) : Text::_('JALL'),
+						'text' => ($value != 0) ? \JText::_('J' . $value) : \JText::_('JALL'),
 					);
 				}
 

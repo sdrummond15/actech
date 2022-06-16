@@ -8,11 +8,12 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
-use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\Component\Menus\Administrator\Helper\MenusHelper;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('groupedlist');
 
 // Import the com_menus helper.
 require_once realpath(JPATH_ADMINISTRATOR . '/components/com_menus/helpers/menus.php');
@@ -22,7 +23,7 @@ require_once realpath(JPATH_ADMINISTRATOR . '/components/com_menus/helpers/menus
  *
  * @since  1.6
  */
-class MenuitemField extends GroupedlistField
+class MenuitemField extends \JFormFieldGroupedList
 {
 	/**
 	 * The form field type.
@@ -131,7 +132,7 @@ class MenuitemField extends GroupedlistField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.
@@ -174,7 +175,7 @@ class MenuitemField extends GroupedlistField
 		$menuType = $this->menuType;
 
 		// Get the menu items.
-		$items = MenusHelper::getMenuLinks($menuType, 0, 0, $this->published, $this->language, $this->clientId);
+		$items = \MenusHelper::getMenuLinks($menuType, 0, 0, $this->published, $this->language, $this->clientId);
 
 		// Build group for a specific menu type.
 		if ($menuType)
@@ -184,8 +185,7 @@ class MenuitemField extends GroupedlistField
 			$query = $db->getQuery(true)
 				->select($db->quoteName('title'))
 				->from($db->quoteName('#__menu_types'))
-				->where($db->quoteName('menutype') . ' = :menuType')
-				->bind(':menuType', $menuType);
+				->where($db->quoteName('menutype') . ' = ' . $db->quote($menuType));
 			$db->setQuery($query);
 
 			try
@@ -215,12 +215,12 @@ class MenuitemField extends GroupedlistField
 					$lang = '';
 				}
 
-				$groups[$menuTitle][] = HTMLHelper::_('select.option',
-					$link->value, $levelPrefix . $link->text . $lang,
-					'value',
-					'text',
-					\in_array($link->type, $this->disable)
-				);
+				$groups[$menuTitle][] = \JHtml::_('select.option',
+								$link->value, $levelPrefix . $link->text . $lang,
+								'value',
+								'text',
+								in_array($link->type, $this->disable)
+							);
 			}
 		}
 		// Build groups for all menu types.
@@ -247,12 +247,12 @@ class MenuitemField extends GroupedlistField
 						$lang = '';
 					}
 
-					$groups[$menu->title][] = HTMLHelper::_('select.option',
-						$link->value, $levelPrefix . $link->text . $lang,
-						'value',
-						'text',
-						\in_array($link->type, $this->disable)
-					);
+					$groups[$menu->title][] = \JHtml::_('select.option',
+										$link->value, $levelPrefix . $link->text . $lang,
+										'value',
+										'text',
+										in_array($link->type, $this->disable)
+									);
 				}
 			}
 		}

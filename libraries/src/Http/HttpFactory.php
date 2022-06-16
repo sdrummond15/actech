@@ -8,10 +8,12 @@
 
 namespace Joomla\CMS\Http;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Version;
-use Joomla\Http\TransportInterface;
+use Joomla\Registry\Registry;
+use Joomla\CMS\Http\Http;
+use Joomla\CMS\Http\TransportInterface;
+use Joomla\CMS\Uri\Uri;
 
 /**
  * HTTP factory class.
@@ -21,33 +23,25 @@ use Joomla\Http\TransportInterface;
 class HttpFactory
 {
 	/**
-	 * Method to create a JHttp instance.
+	 * method to receive Http instance.
 	 *
-	 * @param   array|\ArrayAccess  $options   Client options array.
-	 * @param   array|string        $adapters  Adapter (string) or queue of adapters (array) to use for communication.
+	 * @param   Registry  $options   Client options object.
+	 * @param   mixed     $adapters  Adapter (string) or queue of adapters (array) to use for communication.
 	 *
-	 * @return  Http
+	 * @return  Http      Joomla Http class
+	 *
+	 * @throws  \RuntimeException
 	 *
 	 * @since   3.0.0
-	 * @throws  \RuntimeException
 	 */
-	public static function getHttp($options = [], $adapters = null)
+	public static function getHttp(Registry $options = null, $adapters = null)
 	{
-		if (!\is_array($options) && !($options instanceof \ArrayAccess))
+		if (empty($options))
 		{
-			throw new \InvalidArgumentException(
-				'The options param must be an array or implement the ArrayAccess interface.'
-			);
+			$options = new Registry;
 		}
 
-		// Set default userAgent if nothing else is set
-		if (!isset($options['userAgent']))
-		{
-			$version = new Version;
-			$options['userAgent'] = $version->getUserAgent('Joomla', true, false);
-		}
-
-		if (!$driver = static::getAvailableDriver($options, $adapters))
+		if (!$driver = self::getAvailableDriver($options, $adapters))
 		{
 			throw new \RuntimeException('No transport driver available.');
 		}
@@ -58,18 +52,18 @@ class HttpFactory
 	/**
 	 * Finds an available http transport object for communication
 	 *
-	 * @param   array|\ArrayAccess  $options  Options for creating TransportInterface object
-	 * @param   array|string        $default  Adapter (string) or queue of adapters (array) to use
+	 * @param   Registry  $options  Option for creating http transport object
+	 * @param   mixed     $default  Adapter (string) or queue of adapters (array) to use
 	 *
-	 * @return  TransportInterface|boolean  Interface sub-class or boolean false if no adapters are available
+	 * @return  TransportInterface Interface sub-class
 	 *
 	 * @since   3.0.0
 	 */
-	public static function getAvailableDriver($options = [], $default = null)
+	public static function getAvailableDriver(Registry $options, $default = null)
 	{
-		if (\is_null($default))
+		if (is_null($default))
 		{
-			$availableAdapters = static::getHttpTransports();
+			$availableAdapters = self::getHttpTransports();
 		}
 		else
 		{
@@ -78,14 +72,13 @@ class HttpFactory
 		}
 
 		// Check if there is at least one available http transport adapter
-		if (!\count($availableAdapters))
+		if (!count($availableAdapters))
 		{
 			return false;
 		}
 
 		foreach ($availableAdapters as $adapter)
 		{
-			/** @var $class TransportInterface */
 			$class = __NAMESPACE__ . '\\Transport\\' . ucfirst($adapter) . 'Transport';
 
 			if (!class_exists($class))
@@ -120,7 +113,7 @@ class HttpFactory
 			$fileName = $file->getFilename();
 
 			// Only load for php files.
-			if ($file->isFile() && $file->getExtension() === 'php')
+			if ($file->isFile() && $file->getExtension() == 'php')
 			{
 				$names[] = substr($fileName, 0, strrpos($fileName, 'Transport.'));
 			}

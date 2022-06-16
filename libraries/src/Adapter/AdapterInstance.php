@@ -8,11 +8,9 @@
 
 namespace Joomla\CMS\Adapter;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Factory;
 use Joomla\CMS\Object\CMSObject;
-use Joomla\Database\DatabaseDriver;
 
 /**
  * Adapter Instance Class
@@ -33,7 +31,7 @@ class AdapterInstance extends CMSObject
 	/**
 	 * Database
 	 *
-	 * @var    DatabaseDriver
+	 * @var    \JDatabaseDriver
 	 * @since  1.6
 	 */
 	protected $db = null;
@@ -41,13 +39,13 @@ class AdapterInstance extends CMSObject
 	/**
 	 * Constructor
 	 *
-	 * @param   Adapter         $parent   Parent object
-	 * @param   DatabaseDriver  $db       Database object
-	 * @param   array           $options  Configuration Options
+	 * @param   Adapter           $parent   Parent object
+	 * @param   \JDatabaseDriver  $db       Database object
+	 * @param   array             $options  Configuration Options
 	 *
 	 * @since   1.6
 	 */
-	public function __construct(Adapter $parent, DatabaseDriver $db, array $options = array())
+	public function __construct(Adapter $parent, \JDatabaseDriver $db, array $options = array())
 	{
 		// Set the properties from the options array that is passed in
 		$this->setProperties($options);
@@ -56,7 +54,7 @@ class AdapterInstance extends CMSObject
 		$this->parent = $parent;
 
 		// Pull in the global dbo in case something happened to it.
-		$this->db = $db ?: Factory::getDbo();
+		$this->db = $db ?: \JFactory::getDbo();
 	}
 
 	/**

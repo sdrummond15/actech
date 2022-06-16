@@ -8,17 +8,19 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('list');
 
 /**
  * Content Type field.
  *
  * @since  3.1
  */
-class ContenttypeField extends ListField
+class ContenttypeField extends \JFormFieldList
 {
 	/**
 	 * A flexible tag list that respects access controls
@@ -37,14 +39,14 @@ class ContenttypeField extends ListField
 	 */
 	protected function getInput()
 	{
-		if (!\is_array($this->value))
+		if (!is_array($this->value))
 		{
-			if (\is_object($this->value))
+			if (is_object($this->value))
 			{
 				$this->value = $this->value->tags;
 			}
 
-			if (\is_string($this->value))
+			if (is_string($this->value))
 			{
 				$this->value = explode(',', $this->value);
 			}
@@ -65,15 +67,10 @@ class ContenttypeField extends ListField
 		$lang = Factory::getLanguage();
 		$db    = Factory::getDbo();
 		$query = $db->getQuery(true)
-			->select(
-				[
-					$db->quoteName('a.type_id', 'value'),
-					$db->quoteName('a.type_title', 'text'),
-					$db->quoteName('a.type_alias', 'alias'),
-				]
-			)
-			->from($db->quoteName('#__content_types', 'a'))
-			->order($db->quoteName('a.type_title') . ' ASC');
+			->select('a.type_id AS value, a.type_title AS text, a.type_alias AS alias')
+			->from('#__content_types AS a')
+
+			->order('a.type_title ASC');
 
 		// Get the options.
 		$db->setQuery($query);
@@ -94,15 +91,15 @@ class ContenttypeField extends ListField
 			$comp = array_shift($parts);
 
 			// Make sure the component sys.ini is loaded
-			$lang->load($comp . '.sys', JPATH_ADMINISTRATOR)
-			|| $lang->load($comp . '.sys', JPATH_ADMINISTRATOR . '/components/' . $comp);
+			$lang->load($comp . '.sys', JPATH_ADMINISTRATOR, null, false, true)
+			|| $lang->load($comp . '.sys', JPATH_ADMINISTRATOR . '/components/' . $comp, null, false, true);
 
 			$option->string = implode('_', $parts);
 			$option->string = $comp . '_CONTENT_TYPE_' . $option->string;
 
 			if ($lang->hasKey($option->string))
 			{
-				$option->text = Text::_($option->string);
+				$option->text = \JText::_($option->string);
 			}
 		}
 

@@ -8,9 +8,8 @@
 
 namespace Joomla\CMS\UCM;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Factory;
 use Joomla\CMS\Helper\ContentHelper;
 use Joomla\CMS\Table\Table;
 use Joomla\CMS\Table\TableInterface;
@@ -49,10 +48,10 @@ class UCMBase implements UCM
 	public function __construct($alias = null, UCMType $type = null)
 	{
 		// Setup dependencies.
-		$input = Factory::getApplication()->input;
-		$this->alias = $alias ?: $input->get('option') . '.' . $input->get('view');
+		$input = \JFactory::getApplication()->input;
+		$this->alias = isset($alias) ? $alias : $input->get('option') . '.' . $input->get('view');
 
-		$this->type = $type ?: $this->getType();
+		$this->type = isset($type) ? $type : $this->getType();
 	}
 
 	/**
@@ -74,7 +73,7 @@ class UCMBase implements UCM
 			$table = Table::getInstance('Ucm');
 		}
 
-		$ucmId      = $data['ucm_id'] ?? null;
+		$ucmId      = isset($data['ucm_id']) ? $data['ucm_id'] : null;
 		$primaryKey = $primaryKey ?: $ucmId;
 
 		if (isset($primaryKey))

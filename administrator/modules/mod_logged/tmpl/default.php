@@ -9,55 +9,42 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\CMS\Language\Text;
+JHtml::_('bootstrap.tooltip');
 ?>
-<table class="table" id="<?php echo str_replace(' ', '', $module->title) . $module->id; ?>">
-	<caption class="visually-hidden"><?php echo $module->title; ?></caption>
-	<thead>
-		<tr>
-			<th scope="col" class="w-50">
-				<?php if ($params->get('name', 1) == 0) : ?>
-					<?php echo Text::_('JGLOBAL_USERNAME'); ?>
-				<?php else : ?>
-					<?php echo Text::_('MOD_LOGGED_NAME'); ?>
+<div class="row-striped">
+	<?php foreach ($users as $user) : ?>
+		<div class="row-fluid">
+			<div class="span8">
+				<?php if ($user->client_id == 0) : ?>
+					<a title="<?php echo JHtml::_('tooltipText', 'MOD_LOGGED_LOGOUT'); ?>" href="<?php echo $user->logoutLink; ?>" class="btn btn-danger btn-mini hasTooltip">
+						<span class="icon-remove icon-white" aria-hidden="true"><span class="element-invisible"><?php echo JText::_('JLOGOUT'); ?></span></span>
+					</a>
 				<?php endif; ?>
-			</th>
-			<th scope="col" class="w-30"><?php echo Text::_('JCLIENT'); ?></th>
-			<th scope="col" class="w-20"><?php echo Text::_('JDATE'); ?></th>
-		</tr>
-	</thead>
-	<tbody>
-		<?php foreach ($users as $user) : ?>
-			<tr>
-				<th scope="row">
+
+				<strong class="row-title">
 					<?php if (isset($user->editLink)) : ?>
-						<a href="<?php echo $user->editLink; ?>" title="<?php echo Text::_('JACTION_EDIT'); ?> <?php echo htmlspecialchars($user->name, ENT_QUOTES, 'UTF-8'); ?>">
-							<?php echo htmlspecialchars($user->name, ENT_QUOTES, 'UTF-8'); ?>
-						</a>
+						<a href="<?php echo $user->editLink; ?>" class="hasTooltip" title="<?php echo JHtml::_('tooltipText', 'JGRID_HEADING_ID'); ?> : <?php echo $user->id; ?>">
+							<?php echo $user->name; ?></a>
 					<?php else : ?>
-						<?php echo htmlspecialchars($user->name, ENT_QUOTES, 'UTF-8'); ?>
+						<?php echo $user->name; ?>
 					<?php endif; ?>
-				</th>
-				<td>
+				</strong>
+
+				<small class="small hasTooltip" title="<?php echo JHtml::_('tooltipText', 'JCLIENT'); ?>">
 					<?php if ($user->client_id === null) : ?>
-						<?php // This is a shared session so we do not know the client ?>
-						<?php echo Text::_('JGLOBAL_NONAPPLICABLE'); ?>
+						<?php // Don't display a client ?>
 					<?php elseif ($user->client_id) : ?>
-						<?php echo Text::_('JADMINISTRATION'); ?>
+						<?php echo JText::_('JADMINISTRATION'); ?>
 					<?php else : ?>
-						<form action="<?php echo $user->logoutLink; ?>" method="post" name="adminForm">
-							<?php echo Text::_('JSITE'); ?>
-							<button type="submit" class="me-2 btn btn-danger btn-sm">
-								<?php echo Text::_('JLOGOUT'); ?>
-							</button>
-						</form>
+						<?php echo JText::_('JSITE'); ?>
 					<?php endif; ?>
-				</td>
-				<td>
-					<?php echo HTMLHelper::_('date', $user->time, Text::_('DATE_FORMAT_LC5')); ?>
-				</td>
-			</tr>
-		<?php endforeach; ?>
-	</tbody>
-</table>
+				</small>
+			</div>
+			<div class="span4">
+				<div class="small pull-right hasTooltip" title="<?php echo JHtml::_('tooltipText', 'MOD_LOGGED_LAST_ACTIVITY'); ?>">
+					<span class="icon-calendar" aria-hidden="true"></span> <?php echo JHtml::_('date', $user->time, JText::_('DATE_FORMAT_LC5')); ?>
+				</div>
+			</div>
+		</div>
+	<?php endforeach; ?>
+</div>

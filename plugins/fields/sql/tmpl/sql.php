@@ -8,9 +8,6 @@
  */
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\Database\ParameterType;
-
 $value = $field->value;
 
 if ($value == '')
@@ -18,26 +15,34 @@ if ($value == '')
 	return;
 }
 
-$db    = Factory::getDbo();
-$value = (array) $value;
-$query = $db->getQuery(true);
-$sql   = $fieldParams->get('query', '');
+$db        = JFactory::getDbo();
+$value     = (array) $value;
+$condition = '';
 
-$bindNames = $query->bindArray($value, ParameterType::STRING);
+foreach ($value as $v)
+{
+	if (!$v)
+	{
+		continue;
+	}
+
+	$condition .= ', ' . $db->q($v);
+}
+
+$query = $fieldParams->get('query', '');
 
 // Run the query with a having condition because it supports aliases
-$query->setQuery($sql . ' HAVING ' . $db->quoteName('value') . ' IN (' . implode(',', $bindNames) . ')');
+$db->setQuery($query . ' having value in (' . trim($condition, ',') . ')');
 
 try
 {
-	$db->setQuery($query);
-	$items = $db->loadObjectList();
+	$items = $db->loadObjectlist();
 }
 catch (Exception $e)
 {
 	// If the query failed, we fetch all elements
-	$db->setQuery($sql);
-	$items = $db->loadObjectList();
+	$db->setQuery($query);
+	$items = $db->loadObjectlist();
 }
 
 $texts = array();

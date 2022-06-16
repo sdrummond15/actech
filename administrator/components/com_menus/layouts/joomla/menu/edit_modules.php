@@ -1,7 +1,7 @@
 <?php
 /**
  * @package     Joomla.Administrator
- * @subpackage  com_menus
+ * @subpackage  Layout
  *
  * @copyright   (C) 2016 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
@@ -9,10 +9,7 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Factory;
-
-$app       = Factory::getApplication();
+$app       = JFactory::getApplication();
 $form      = $displayData->getForm();
 $input     = $app->input;
 $component = $input->getCmd('option', 'com_content');
@@ -24,7 +21,7 @@ if ($component == 'com_categories')
 	$component = $parts[0];
 }
 
-$saveHistory = ComponentHelper::getParams($component)->get('save_history', 0);
+$saveHistory = JComponentHelper::getParams($component)->get('save_history', 0);
 
 $fields = $displayData->get('fields') ?: array(
 	array('parent', 'parent_id'),
@@ -47,7 +44,7 @@ if (!$saveHistory)
 }
 
 $html   = array();
-$html[] = '<fieldset><ul class="list-unstyled">';
+$html[] = '<fieldset class="form-horizontal"><ul class="horizontal-buttons unstyled">';
 
 foreach ($fields as $field)
 {

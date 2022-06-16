@@ -8,21 +8,23 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
+use Joomla\CMS\Form\FormHelper;
 use Joomla\CMS\Helper\TagsHelper;
 use Joomla\CMS\Language\Multilanguage;
-use Joomla\Database\ParameterType;
 use Joomla\Utilities\ArrayHelper;
+
+FormHelper::loadFieldClass('list');
 
 /**
  * List of Tags field.
  *
  * @since  3.1
  */
-class TagField extends ListField
+class TagField extends \JFormFieldList
 {
 	/**
 	 * A flexible tag list that respects access controls
@@ -49,14 +51,6 @@ class TagField extends ListField
 	protected $comParams = null;
 
 	/**
-	 * Name of the layout being used to render the field
-	 *
-	 * @var    string
-	 * @since  4.0.0
-	 */
-	protected $layout = 'joomla.form.field.tag';
-
-	/**
 	 * Constructor
 	 *
 	 * @since  3.1
@@ -78,9 +72,18 @@ class TagField extends ListField
 	 */
 	protected function getInput()
 	{
-		$data = $this->getLayoutData();
+		// AJAX mode requires ajax-chosen
+		if (!$this->isNested())
+		{
+			// Get the field id
+			$id    = isset($this->element['id']) ? $this->element['id'] : null;
+			$cssId = '#' . $this->getId($id, $this->element['name']);
 
-		if (!\is_array($this->value) && !empty($this->value))
+			// Load the ajax-chosen customised field
+			\JHtml::_('tag.ajaxfield', $cssId, $this->allowCustom());
+		}
+
+		if (!is_array($this->value) && !empty($this->value))
 		{
 			if ($this->value instanceof TagsHelper)
 			{
@@ -95,27 +98,13 @@ class TagField extends ListField
 			}
 
 			// String in format 2,5,4
-			if (\is_string($this->value))
+			if (is_string($this->value))
 			{
 				$this->value = explode(',', $this->value);
 			}
-
-			// Integer is given
-			if (\is_int($this->value))
-			{
-				$this->value = array($this->value);
-			}
-
-			$data['value'] = $this->value;
 		}
 
-		$data['remoteSearch']  = $this->isRemoteSearch();
-		$data['options']       = $this->getOptions();
-		$data['isNested']      = $this->isNested();
-		$data['allowCustom']   = $this->allowCustom();
-		$data['minTermLength'] = (int) $this->comParams->get('min_term_length', 3);
-
-		return $this->getRenderer($this->layout)->render($data);
+		return parent::getInput();
 	}
 
 	/**
@@ -129,33 +118,21 @@ class TagField extends ListField
 	{
 		$published = (string) $this->element['published'] ?: array(0, 1);
 		$app       = Factory::getApplication();
-		$language  = null;
-		$options   = [];
-
-		// This limit is only used with isRemoteSearch
-		$prefillLimit   = 30;
-		$isRemoteSearch = $this->isRemoteSearch();
+		$tag       = $app->getLanguage()->getTag();
 
 		$db    = Factory::getDbo();
 		$query = $db->getQuery(true)
-			->select(
-				[
-					$db->quoteName('a.id', 'value'),
-					$db->quoteName('a.path'),
-					$db->quoteName('a.title', 'text'),
-					$db->quoteName('a.level'),
-					$db->quoteName('a.published'),
-					$db->quoteName('a.lft'),
-				]
-			)
-			->from($db->quoteName('#__tags', 'a'));
+			->select('a.id AS value, a.path, a.title AS text, a.level, a.published, a.lft')
+			->from($db->qn('#__tags') . ' AS a');			
 
 		// Limit Options in multilanguage
 		if ($app->isClient('site') && Multilanguage::isEnabled())
 		{
-			if (ComponentHelper::getParams('com_tags')->get('tag_list_language_filter') === 'current_language')
+			$lang = ComponentHelper::getParams('com_tags')->get('tag_list_language_filter');
+
+			if ($lang == 'current_language')
 			{
-				$language = [$app->getLanguage()->getTag(), '*'];
+				$query->where('a.language in (' . $db->quote($tag) . ',' . $db->quote('*') . ')');
 			}
 		}
 		// Filter language
@@ -163,104 +140,41 @@ class TagField extends ListField
 		{
 			if (strpos($this->element['language'], ',') !== false)
 			{
-				$language = explode(',', $this->element['language']);
+				$language = implode(',', $db->quote(explode(',', $this->element['language'])));
 			}
 			else
 			{
-				$language = [$this->element['language']];
+				$language = $db->quote($this->element['language']);
 			}
+
+			$query->where($db->quoteName('a.language') . ' IN (' . $language . ')');
 		}
 
-		if ($language)
-		{
-			$query->whereIn($db->quoteName('a.language'), $language, ParameterType::STRING);
-		}
-
-		$query->where($db->quoteName('a.lft') . ' > 0');
+		$query->where($db->qn('a.lft') . ' > 0');
 
 		// Filter on the published state
 		if (is_numeric($published))
 		{
-			$published = (int) $published;
-			$query->where($db->quoteName('a.published') . ' = :published')
-				->bind(':published', $published, ParameterType::INTEGER);
+			$query->where('a.published = ' . (int) $published);
 		}
-		elseif (\is_array($published))
+		elseif (is_array($published))
 		{
 			$published = ArrayHelper::toInteger($published);
-			$query->whereIn($db->quoteName('a.published'), $published);
+			$query->where('a.published IN (' . implode(',', $published) . ')');
 		}
 
-		$query->order($db->quoteName('a.lft') . ' ASC');
+		$query->order('a.lft ASC');
 
-		// Preload only active values and 30 most used tags or fill up
-		if ($isRemoteSearch)
+		// Get the options.
+		$db->setQuery($query);
+
+		try
 		{
-			// Load the most $prefillLimit used tags
-			$topQuery = $db->getQuery(true)
-				->select($db->quoteName('tag_id'))
-				->from($db->quoteName('#__contentitem_tag_map'))
-				->group($db->quoteName('tag_id'))
-				->order('count(*)')
-				->setLimit($prefillLimit);
-
-			$db->setQuery($topQuery);
-			$topIds = $db->loadColumn();
-
-			// Merge the used values into the most used tags
-			if (!empty($this->value) && is_array($this->value))
-			{
-				$topIds = array_merge($topIds, $this->value);
-				$topIds = array_keys(array_flip($topIds));
-			}
-
-			// Set the default limit for the main query
-			$query->setLimit($prefillLimit);
-
-			if (!empty($topIds))
-			{
-				// Filter the ids to the most used tags and the selected tags
-				$preQuery = clone $query;
-				$preQuery->whereIn($db->quoteName('a.id'), $topIds);
-
-				$db->setQuery($preQuery);
-
-				try
-				{
-					$options = $db->loadObjectList();
-				}
-				catch (\RuntimeException $e)
-				{
-					return array();
-				}
-
-				// Limit the main query to the missing amount of tags
-				$count = count($options);
-				$prefillLimit = $prefillLimit - $count;
-				$query->setLimit($prefillLimit);
-
-				// Exclude the already loaded tags from the main query
-				if ($count > 0)
-				{
-					$query->whereNotIn($db->quoteName('a.id'), ArrayHelper::getColumn($options, 'value'));
-				}
-			}
+			$options = $db->loadObjectList();
 		}
-
-		// Only execute the query if we need more tags not already loaded by the $preQuery query
-		if (!$isRemoteSearch || $prefillLimit > 0)
+		catch (\RuntimeException $e)
 		{
-			// Get the options.
-			$db->setQuery($query);
-
-			try
-			{
-				$options = array_merge($options, $db->loadObjectList());
-			}
-			catch (\RuntimeException $e)
-			{
-				return array();
-			}
+			return array();
 		}
 
 		// Block the possibility to set a tag as it own parent
@@ -345,28 +259,11 @@ class TagField extends ListField
 	 */
 	public function allowCustom()
 	{
-		if ($this->element['custom'] && \in_array((string) $this->element['custom'], array('0', 'false', 'deny')))
+		if (isset($this->element['custom']) && (string) $this->element['custom'] === 'deny')
 		{
 			return false;
 		}
 
-		return Factory::getUser()->authorise('core.create', 'com_tags');
-	}
-
-	/**
-	 * Check whether need to enable AJAX search
-	 *
-	 * @return  boolean
-	 *
-	 * @since   4.0.0
-	 */
-	public function isRemoteSearch()
-	{
-		if ($this->element['remote-search'])
-		{
-			return !\in_array((string) $this->element['remote-search'], array('0', 'false', ''));
-		}
-
-		return $this->comParams->get('tag_field_ajax_mode', 1) == 1;
+		return true;
 	}
 }

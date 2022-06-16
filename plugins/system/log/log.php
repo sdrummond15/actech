@@ -9,16 +9,12 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Authentication\Authentication;
-use Joomla\CMS\Log\Log;
-use Joomla\CMS\Plugin\CMSPlugin;
-
 /**
  * Joomla! System Logging Plugin.
  *
  * @since  1.5
  */
-class PlgSystemLog extends CMSPlugin
+class PlgSystemLog extends JPlugin
 {
 	/**
 	 * Called if user fails to be logged in.
@@ -35,12 +31,12 @@ class PlgSystemLog extends CMSPlugin
 
 		switch ($response['status'])
 		{
-			case Authentication::STATUS_SUCCESS:
+			case JAuthentication::STATUS_SUCCESS:
 				$errorlog['status']  = $response['type'] . ' CANCELED: ';
 				$errorlog['comment'] = $response['error_message'];
 				break;
 
-			case Authentication::STATUS_FAILURE:
+			case JAuthentication::STATUS_FAILURE:
 				$errorlog['status']  = $response['type'] . ' FAILURE: ';
 
 				if ($this->params->get('log_username', 0))
@@ -59,11 +55,11 @@ class PlgSystemLog extends CMSPlugin
 				break;
 		}
 
-		Log::addLogger(array(), Log::INFO);
+		JLog::addLogger(array(), JLog::INFO);
 
 		try
 		{
-			Log::add($errorlog['comment'], Log::INFO, $errorlog['status']);
+			JLog::add($errorlog['comment'], JLog::INFO, $errorlog['status']);
 		}
 		catch (Exception $e)
 		{

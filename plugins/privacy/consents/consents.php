@@ -9,10 +9,7 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\User\User;
-use Joomla\Component\Privacy\Administrator\Plugin\PrivacyPlugin;
-use Joomla\Component\Privacy\Administrator\Table\RequestTable;
-use Joomla\Database\ParameterType;
+JLoader::register('PrivacyPlugin', JPATH_ADMINISTRATOR . '/components/com_privacy/helpers/plugin.php');
 
 /**
  * Privacy plugin managing Joomla user consent data
@@ -26,31 +23,29 @@ class PlgPrivacyConsents extends PrivacyPlugin
 	 *
 	 * This event will collect data for the core `#__privacy_consents` table
 	 *
-	 * @param   RequestTable  $request  The request record being processed
-	 * @param   User          $user     The user account associated with this request if available
+	 * @param   PrivacyTableRequest  $request  The request record being processed
+	 * @param   JUser                $user     The user account associated with this request if available
 	 *
-	 * @return  \Joomla\Component\Privacy\Administrator\Export\Domain[]
+	 * @return  PrivacyExportDomain[]
 	 *
 	 * @since   3.9.0
 	 */
-	public function onPrivacyExportRequest(RequestTable $request, User $user = null)
+	public function onPrivacyExportRequest(PrivacyTableRequest $request, JUser $user = null)
 	{
 		if (!$user)
 		{
 			return array();
 		}
 
-		$domain = $this->createDomain('consents', 'joomla_consent_data');
-		$db     = $this->db;
+		$domain    = $this->createDomain('consents', 'joomla_consent_data');
 
-		$query = $db->getQuery(true)
+		$query = $this->db->getQuery(true)
 			->select('*')
-			->from($db->quoteName('#__privacy_consents'))
-			->where($db->quoteName('user_id') . ' = :id')
-			->order($db->quoteName('created') . ' ASC')
-			->bind(':id', $user->id, ParameterType::INTEGER);
+			->from($this->db->quoteName('#__privacy_consents'))
+			->where($this->db->quoteName('user_id') . ' = ' . (int) $user->id)
+			->order($this->db->quoteName('created') . ' ASC');
 
-		$items = $db->setQuery($query)->loadAssocList();
+		$items = $this->db->setQuery($query)->loadAssocList();
 
 		foreach ($items as $item)
 		{

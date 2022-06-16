@@ -8,23 +8,22 @@
 
 namespace Joomla\CMS\Updater;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Adapter\AdapterInstance;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Http\HttpFactory;
-use Joomla\CMS\Language\Text;
 use Joomla\CMS\Log\Log;
 use Joomla\CMS\Version;
-use Joomla\Database\ParameterType;
 use Joomla\Registry\Registry;
+
+\JLoader::import('joomla.base.adapterinstance');
 
 /**
  * UpdateAdapter class.
  *
  * @since  1.7.0
  */
-abstract class UpdateAdapter extends AdapterInstance
+abstract class UpdateAdapter extends \JAdapterInstance
 {
 	/**
 	 * Resource handle for the XML Parser
@@ -45,7 +44,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	/**
 	 * ID of update site
 	 *
-	 * @var    integer
+	 * @var    string
 	 * @since  3.0.0
 	 */
 	protected $updateSiteId = 0;
@@ -56,12 +55,12 @@ abstract class UpdateAdapter extends AdapterInstance
 	 * @var    array
 	 * @since  3.0.0
 	 */
-	protected $updatecols = array('NAME', 'ELEMENT', 'TYPE', 'FOLDER', 'CLIENT', 'VERSION', 'DESCRIPTION', 'INFOURL', 'CHANGELOGURL', 'EXTRA_QUERY');
+	protected $updatecols = array('NAME', 'ELEMENT', 'TYPE', 'FOLDER', 'CLIENT', 'VERSION', 'DESCRIPTION', 'INFOURL', 'EXTRA_QUERY');
 
 	/**
 	 * Should we try appending a .xml extension to the update site's URL?
 	 *
-	 * @var   boolean
+	 * @var   bool
 	 */
 	protected $appendExtension = false;
 
@@ -87,7 +86,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	 * 3	rc			Release Candidate versions (almost stable, minor bugs might be present)
 	 * 4	stable		Stable versions (production quality code)
 	 *
-	 * @var    integer
+	 * @var    int
 	 * @since  14.1
 	 *
 	 * @see    Updater
@@ -97,7 +96,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	/**
 	 * Gets the reference to the current direct parent
 	 *
-	 * @return  string
+	 * @return  object
 	 *
 	 * @since   1.7.0
 	 */
@@ -115,7 +114,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	 */
 	protected function _getLastTag()
 	{
-		return $this->stack[\count($this->stack) - 1];
+		return $this->stack[count($this->stack) - 1];
 	}
 
 	/**
@@ -142,7 +141,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	protected function toggleUpdateSite($updateSiteId, $enabled = true)
 	{
 		$updateSiteId = (int) $updateSiteId;
-		$enabled = (bool) $enabled ? 1 : 0;
+		$enabled = (bool) $enabled;
 
 		if (empty($updateSiteId))
 		{
@@ -151,11 +150,9 @@ abstract class UpdateAdapter extends AdapterInstance
 
 		$db = $this->parent->getDbo();
 		$query = $db->getQuery(true)
-			->update($db->quoteName('#__update_sites'))
-			->set($db->quoteName('enabled') . ' = :enabled')
-			->where($db->quoteName('update_site_id') . ' = :id')
-			->bind(':enabled', $enabled, ParameterType::INTEGER)
-			->bind(':id', $updateSiteId, ParameterType::INTEGER);
+			->update($db->qn('#__update_sites'))
+			->set($db->qn('enabled') . ' = ' . $db->q($enabled ? 1 : 0))
+			->where($db->qn('update_site_id') . ' = ' . $db->q($updateSiteId));
 		$db->setQuery($query);
 
 		try
@@ -186,10 +183,9 @@ abstract class UpdateAdapter extends AdapterInstance
 
 		$db = $this->parent->getDbo();
 		$query = $db->getQuery(true)
-			->select($db->quoteName('name'))
-			->from($db->quoteName('#__update_sites'))
-			->where($db->quoteName('update_site_id') . ' = :id')
-			->bind(':id', $updateSiteId, ParameterType::INTEGER);
+			->select($db->qn('name'))
+			->from($db->qn('#__update_sites'))
+			->where($db->qn('update_site_id') . ' = ' . $db->q($updateSiteId));
 		$db->setQuery($query);
 
 		$name = '';
@@ -211,7 +207,7 @@ abstract class UpdateAdapter extends AdapterInstance
 	 *
 	 * @param   array  $options  The update options, see findUpdate() in children classes
 	 *
-	 * @return  \Joomla\CMS\Http\Response|bool  False if we can't connect to the site, HTTP Response object otherwise
+	 * @return  boolean|\JHttpResponse  False if we can't connect to the site, JHttpResponse otherwise
 	 *
 	 * @throws  \Exception
 	 */
@@ -229,14 +225,14 @@ abstract class UpdateAdapter extends AdapterInstance
 		$this->updateSiteName  = $options['update_site_name'];
 		$this->appendExtension = false;
 
-		if (\array_key_exists('append_extension', $options))
+		if (array_key_exists('append_extension', $options))
 		{
 			$this->appendExtension = $options['append_extension'];
 		}
 
-		if ($this->appendExtension && (substr($url, -4) !== '.xml'))
+		if ($this->appendExtension && (substr($url, -4) != '.xml'))
 		{
-			if (substr($url, -1) !== '/')
+			if (substr($url, -1) != '/')
 			{
 				$url .= '/';
 			}
@@ -279,7 +275,7 @@ abstract class UpdateAdapter extends AdapterInstance
 		if ($response === null || $response->code !== 200)
 		{
 			// If the URL is missing the .xml extension, try appending it and retry loading the update
-			if (!$this->appendExtension && (substr($url, -4) !== '.xml'))
+			if (!$this->appendExtension && (substr($url, -4) != '.xml'))
 			{
 				$options['append_extension'] = true;
 
@@ -289,7 +285,7 @@ abstract class UpdateAdapter extends AdapterInstance
 			// Log the exact update site name and URL which could not be loaded
 			Log::add('Error opening url: ' . $url . ' for update site: ' . $this->updateSiteName, Log::WARNING, 'updater');
 			$app = Factory::getApplication();
-			$app->enqueueMessage(Text::sprintf('JLIB_UPDATER_ERROR_OPEN_UPDATE_SITE', $this->updateSiteId, $this->updateSiteName, $url), 'warning');
+			$app->enqueueMessage(\JText::sprintf('JLIB_UPDATER_ERROR_OPEN_UPDATE_SITE', $this->updateSiteId, $this->updateSiteName, $url), 'warning');
 
 			return false;
 		}

@@ -8,11 +8,7 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
-use Joomla\Database\ParameterType;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Viewlevels table class.
@@ -24,11 +20,11 @@ class ViewLevel extends Table
 	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  Database driver object.
+	 * @param   \JDatabaseDriver  $db  Database driver object.
 	 *
 	 * @since   1.7.0
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct($db)
 	{
 		parent::__construct('#__viewlevels', 'id', $db);
 	}
@@ -48,7 +44,7 @@ class ViewLevel extends Table
 		// Bind the rules as appropriate.
 		if (isset($array['rules']))
 		{
-			if (\is_array($array['rules']))
+			if (is_array($array['rules']))
 			{
 				$array['rules'] = json_encode($array['rules']);
 			}
@@ -66,41 +62,26 @@ class ViewLevel extends Table
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		// Validate the title.
 		if ((trim($this->title)) == '')
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_VIEWLEVEL'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_VIEWLEVEL'));
 
 			return false;
 		}
-
-		$id = (int) $this->id;
 
 		// Check for a duplicate title.
 		$db = $this->_db;
 		$query = $db->getQuery(true)
-			->select('COUNT(' . $db->quoteName('title') . ')')
+			->select('COUNT(title)')
 			->from($db->quoteName('#__viewlevels'))
-			->where($db->quoteName('title') . ' = :title')
-			->where($db->quoteName('id') . ' != :id')
-			->bind(':title', $this->title)
-			->bind(':id', $id, ParameterType::INTEGER);
+			->where($db->quoteName('title') . ' = ' . $db->quote($this->title))
+			->where($db->quoteName('id') . ' != ' . (int) $this->id);
 		$db->setQuery($query);
 
 		if ($db->loadResult() > 0)
 		{
-			$this->setError(Text::sprintf('JLIB_DATABASE_ERROR_USERLEVEL_NAME_EXISTS', $this->title));
+			$this->setError(\JText::sprintf('JLIB_DATABASE_ERROR_USERLEVEL_NAME_EXISTS', $this->title));
 
 			return false;
 		}

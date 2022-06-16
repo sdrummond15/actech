@@ -8,17 +8,20 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\Form\Form;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('predefinedlist');
 
 /**
  * Registration Date Range field.
  *
  * @since  3.2
  */
-class RegistrationdaterangeField extends PredefinedlistField
+class RegistrationdaterangeField extends \JFormFieldPredefinedList
 {
 	/**
 	 * The form field type.

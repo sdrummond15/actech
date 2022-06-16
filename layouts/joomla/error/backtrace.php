@@ -9,8 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\HTML\HTMLHelper;
-
 /** @var $displayData array */
 $backtraceList = $displayData['backtrace'];
 
@@ -19,49 +17,49 @@ if (!$backtraceList)
 	return;
 }
 
-$class = $displayData['class'] ?? 'table table-striped table-bordered';
+$class = isset($displayData['class']) ? $displayData['class'] : 'table table-striped table-bordered';
 ?>
-<table class="<?php echo $class ?>">
+<table cellpadding="0" cellspacing="0" class="Table <?php echo $class ?>">
 	<tr>
-		<td colspan="3">
+		<td colspan="3" class="TD">
 			<strong>Call stack</strong>
 		</td>
 	</tr>
 
 	<tr>
-		<td>
+		<td class="TD">
 			<strong>#</strong>
 		</td>
-		<td>
+		<td class="TD">
 			<strong>Function</strong>
 		</td>
-		<td>
+		<td class="TD">
 			<strong>Location</strong>
 		</td>
 	</tr>
 
 	<?php foreach ($backtraceList as $k => $backtrace): ?>
 	<tr>
-		<td>
+		<td class="TD">
 			<?php echo $k + 1; ?>
 		</td>
 
 		<?php if (isset($backtrace['class'])): ?>
-		<td>
+		<td class="TD">
 			<?php echo $backtrace['class'] . $backtrace['type'] . $backtrace['function'] . '()'; ?>
 		</td>
 		<?php else: ?>
-		<td>
+		<td class="TD">
 			<?php echo $backtrace['function'] . '()'; ?>
 		</td>
 		<?php endif; ?>
 
 		<?php if (isset($backtrace['file'])): ?>
-		<td>
-			<?php echo HTMLHelper::_('debug.xdebuglink', $backtrace['file'], $backtrace['line']); ?>
+		<td class="TD">
+			<?php echo JHtml::_('debug.xdebuglink', $backtrace['file'], $backtrace['line']); ?>
 		</td>
 		<?php else: ?>
-		<td>
+		<td class="TD">
 			&#160;
 		</td>
 		<?php endif; ?>

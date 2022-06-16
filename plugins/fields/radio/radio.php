@@ -9,38 +9,13 @@
 
 defined('_JEXEC') or die;
 
+JLoader::import('components.com_fields.libraries.fieldslistplugin', JPATH_ADMINISTRATOR);
+
 /**
  * Fields Radio Plugin
  *
  * @since  3.7.0
  */
-class PlgFieldsRadio extends \Joomla\Component\Fields\Administrator\Plugin\FieldsListPlugin
+class PlgFieldsRadio extends FieldsListPlugin
 {
-	/**
-	 * Before prepares the field value.
-	 *
-	 * @param   string     $context  The context.
-	 * @param   \stdclass  $item     The item.
-	 * @param   \stdclass  $field    The field.
-	 *
-	 * @return  void
-	 *
-	 * @since   3.7.0
-	 */
-	public function onCustomFieldsBeforePrepareField($context, $item, $field)
-	{
-		if (!$this->app->isClient('api'))
-		{
-			return;
-		}
-
-		if (!$this->isTypeSupported($field->type))
-		{
-			return;
-		}
-
-		$options = $this->getOptionsFromField($field);
-
-		$field->apivalue = [$field->value => $options[$field->value]];
-	}
 }

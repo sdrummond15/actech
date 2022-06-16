@@ -9,14 +9,12 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Helper\ModuleHelper;
-use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\CMS\Plugin\PluginHelper;
-
 if ($params->def('prepare_content', 1))
 {
-	PluginHelper::importPlugin('content');
-	$module->content = HTMLHelper::_('content.prepare', $module->content, '', 'mod_custom.content');
+	JPluginHelper::importPlugin('content');
+	$module->content = JHtml::_('content.prepare', $module->content, '', 'mod_custom.content');
 }
 
-require ModuleHelper::getLayoutPath('mod_custom', $params->get('layout', 'default'));
+$moduleclass_sfx = htmlspecialchars($params->get('moduleclass_sfx', ''), ENT_COMPAT, 'UTF-8');
+
+require JModuleHelper::getLayoutPath('mod_custom', $params->get('layout', 'default'));

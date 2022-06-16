@@ -8,12 +8,10 @@
 
 namespace Joomla\CMS\Log\Logger;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Factory;
 use Joomla\CMS\Log\LogEntry;
 use Joomla\CMS\Log\Logger;
-use Joomla\Database\DatabaseDriver;
 
 /**
  * Joomla! MySQL Database Log class
@@ -77,7 +75,7 @@ class DatabaseLogger extends Logger
 	/**
 	 * The database driver object for the logger.
 	 *
-	 * @var    DatabaseDriver
+	 * @var    \JDatabaseDriver
 	 * @since  1.7.0
 	 */
 	protected $db;
@@ -97,7 +95,7 @@ class DatabaseLogger extends Logger
 		// If both the database object and driver options are empty we want to use the system database connection.
 		if (empty($this->options['db_driver']))
 		{
-			$this->db = Factory::getDbo();
+			$this->db = \JFactory::getDbo();
 			$this->driver = null;
 			$this->host = null;
 			$this->user = null;
@@ -154,7 +152,7 @@ class DatabaseLogger extends Logger
 	 */
 	protected function connect()
 	{
-		// Build the configuration object to use for DatabaseDriver.
+		// Build the configuration object to use for JDatabaseDriver.
 		$options = array(
 			'driver' => $this->driver,
 			'host' => $this->host,
@@ -164,6 +162,6 @@ class DatabaseLogger extends Logger
 			'prefix' => $this->prefix,
 		);
 
-		$this->db = DatabaseDriver::getInstance($options);
+		$this->db = \JDatabaseDriver::getInstance($options);
 	}
 }

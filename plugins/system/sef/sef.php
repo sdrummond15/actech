@@ -9,20 +9,17 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Router\Route;
-use Joomla\CMS\Uri\Uri;
-
 /**
  * Joomla! SEF Plugin.
  *
  * @since  1.5
  */
-class PlgSystemSef extends CMSPlugin
+class PlgSystemSef extends JPlugin
 {
 	/**
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * Application object.
 	 *
+	 * @var    JApplicationCms
 	 * @since  3.5
 	 */
 	protected $app;
@@ -70,12 +67,12 @@ class PlgSystemSef extends CMSPlugin
 			unset($doc->_links[$canonical]);
 
 			// Set the current canonical link but use the SEF system plugin domain field.
-			$canonical = $sefDomain . Uri::getInstance($canonical)->toString(array('path', 'query', 'fragment'));
+			$canonical = $sefDomain . JUri::getInstance($canonical)->toString(array('path', 'query', 'fragment'));
 		}
 		// If a canonical html doesn't exists already add a canonical html tag using the SEF plugin domain field.
 		else
 		{
-			$canonical = $sefDomain . Uri::getInstance()->toString(array('path', 'query', 'fragment'));
+			$canonical = $sefDomain . JUri::getInstance()->toString(array('path', 'query', 'fragment'));
 		}
 
 		// Add the canonical link.
@@ -95,11 +92,11 @@ class PlgSystemSef extends CMSPlugin
 		}
 
 		// Replace src links.
-		$base   = Uri::base(true) . '/';
+		$base   = JUri::base(true) . '/';
 		$buffer = $this->app->getBody();
 
 		// For feeds we need to search for the URL with domain.
-		$prefix = $this->app->getDocument()->getType() === 'feed' ? Uri::root() : '';
+		$prefix = $this->app->getDocument()->getType() === 'feed' ? JUri::root() : '';
 
 		// Replace index.php URI by SEF URI.
 		if (strpos($buffer, 'href="' . $prefix . 'index.php?') !== false)
@@ -110,7 +107,7 @@ class PlgSystemSef extends CMSPlugin
 			{
 				$buffer = str_replace(
 					'href="' . $prefix . 'index.php?' . $urlQueryString . '"',
-					'href="' . trim($prefix, '/') . Route::_('index.php?' . $urlQueryString) . '"',
+					'href="' . trim($prefix, '/') . JRoute::_('index.php?' . $urlQueryString) . '"',
 					$buffer
 				);
 			}
@@ -239,5 +236,25 @@ class PlgSystemSef extends CMSPlugin
 
 			throw new RuntimeException($message);
 		}
+	}
+
+	/**
+	 * Replace the matched tags.
+	 *
+	 * @param   array  &$matches  An array of matches (see preg_match_all).
+	 *
+	 * @return  string
+	 *
+	 * @deprecated  4.0  No replacement.
+	 */
+	protected static function route(&$matches)
+	{
+		JLog::add(__METHOD__ . ' is deprecated, no replacement.', JLog::WARNING, 'deprecated');
+
+		$url   = $matches[1];
+		$url   = str_replace('&amp;', '&', $url);
+		$route = JRoute::_('index.php?' . $url);
+
+		return 'href="' . $route;
 	}
 }

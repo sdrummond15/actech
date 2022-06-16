@@ -8,22 +8,19 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Application\ApplicationHelper;
 use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Folder;
-use Joomla\CMS\Form\Form;
-use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\CMS\Language\Text;
-use Joomla\Database\ParameterType;
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('groupedlist');
 
 /**
  * Chrome Styles field.
  *
  * @since  3.0
  */
-class ChromestyleField extends GroupedlistField
+class ChromestyleField extends \JFormFieldGroupedList
 {
 	/**
 	 * The form field type.
@@ -52,9 +49,10 @@ class ChromestyleField extends GroupedlistField
 	 */
 	public function __get($name)
 	{
-		if ($name === 'clientId')
+		switch ($name)
 		{
-			return $this->clientId;
+			case 'clientId':
+				return $this->clientId;
 		}
 
 		return parent::__get($name);
@@ -75,7 +73,7 @@ class ChromestyleField extends GroupedlistField
 		switch ($name)
 		{
 			case 'clientId':
-				$this->clientId = (int) $value;
+				$this->clientId = (string) $value;
 				break;
 
 			default:
@@ -84,7 +82,7 @@ class ChromestyleField extends GroupedlistField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.
@@ -94,7 +92,7 @@ class ChromestyleField extends GroupedlistField
 	 *
 	 * @return  boolean  True on success.
 	 *
-	 * @see     FormField::setup()
+	 * @see     JFormField::setup()
 	 * @since   3.2
 	 */
 	public function setup(\SimpleXMLElement $element, $value, $group = null)
@@ -112,12 +110,12 @@ class ChromestyleField extends GroupedlistField
 
 				if (isset($clientName))
 				{
-					$client = ApplicationHelper::getClientInfo($clientName, true);
+					$client = \JApplicationHelper::getClientInfo($clientName, true);
 					$clientId = $client->id;
 				}
 			}
 
-			if (!isset($clientId) && $this->form instanceof Form)
+			if (!isset($clientId) && $this->form instanceof \JForm)
 			{
 				$clientId = $this->form->getValue('client_id');
 			}
@@ -142,8 +140,8 @@ class ChromestyleField extends GroupedlistField
 		$groups = array();
 
 		// Add Module Style Field
-		$tmp = '---' . Text::_('JLIB_FORM_VALUE_FROM_TEMPLATE') . '---';
-		$groups[$tmp][] = HTMLHelper::_('select.option', '0', Text::_('JLIB_FORM_VALUE_INHERITED'));
+		$tmp = '---' . \JText::_('JLIB_FORM_VALUE_FROM_TEMPLATE') . '---';
+		$groups[$tmp][] = \JHtml::_('select.option', '0', \JText::_('JLIB_FORM_VALUE_INHERITED'));
 
 		$templateStyles = $this->getTemplateModuleStyles();
 
@@ -155,7 +153,7 @@ class ChromestyleField extends GroupedlistField
 
 			foreach ($styles as $style)
 			{
-				$tmp = HTMLHelper::_('select.option', $template . '-' . $style, $style);
+				$tmp = \JHtml::_('select.option', $template . '-' . $style, $style);
 				$groups[$template][] = $tmp;
 			}
 		}
@@ -176,17 +174,8 @@ class ChromestyleField extends GroupedlistField
 	{
 		$moduleStyles = array();
 
-		// Global Layouts
-		$layouts = Folder::files(JPATH_SITE . '/layouts/chromes', '.*\.php');
-
-		foreach ($layouts as &$layout)
-		{
-			$layout = basename($layout, '.php');
-		}
-
-		$moduleStyles['system'] = $layouts;
-
-		$templates = $this->getTemplates();
+		$templates = array($this->getSystemTemplate());
+		$templates = array_merge($templates, $this->getTemplates());
 		$path      = JPATH_ADMINISTRATOR;
 
 		if ($this->clientId === 0)
@@ -196,27 +185,41 @@ class ChromestyleField extends GroupedlistField
 
 		foreach ($templates as $template)
 		{
-			$chromeLayoutPath = $path . '/templates/' . $template->element . '/html/layouts/chromes';
+			$modulesFilePath = $path . '/templates/' . $template->element . '/html/modules.php';
 
-			if (!Folder::exists($chromeLayoutPath))
+			// Is there modules.php for that template?
+			if (file_exists($modulesFilePath))
 			{
-				continue;
-			}
+				$modulesFileData = file_get_contents($modulesFilePath);
 
-			$layouts = Folder::files($chromeLayoutPath, '.*\.php');
+				preg_match_all('/function[\s\t]*modChrome\_([a-z0-9\-\_]*)[\s\t]*\(/i', $modulesFileData, $styles);
 
-			if ($layouts)
-			{
-				foreach ($layouts as &$layout)
+				if (!array_key_exists($template->element, $moduleStyles))
 				{
-					$layout = basename($layout, '.php');
+					$moduleStyles[$template->element] = array();
 				}
 
-				$moduleStyles[$template->element] = $layouts;
+				$moduleStyles[$template->element] = $styles[1];
 			}
 		}
 
 		return $moduleStyles;
+	}
+
+	/**
+	 * Method to get the system template as an object.
+	 *
+	 * @return  \stdClass  The object of system template.
+	 *
+	 * @since   3.0
+	 */
+	protected function getSystemTemplate()
+	{
+		$template = new \stdClass;
+		$template->element = 'system';
+		$template->name    = 'system';
+
+		return $template;
 	}
 
 	/**
@@ -234,21 +237,11 @@ class ChromestyleField extends GroupedlistField
 		$query = $db->getQuery(true);
 
 		// Build the query.
-		$query->select(
-			[
-				$db->quoteName('element'),
-				$db->quoteName('name'),
-			]
-		)
-			->from($db->quoteName('#__extensions'))
-			->where(
-				[
-					$db->quoteName('client_id') . ' = :clientId',
-					$db->quoteName('type') . ' = ' . $db->quote('template'),
-					$db->quoteName('enabled') . ' = 1',
-				]
-			)
-			->bind(':clientId', $this->clientId, ParameterType::INTEGER);
+		$query->select('element, name')
+			->from('#__extensions')
+			->where('client_id = ' . $this->clientId)
+			->where('type = ' . $db->quote('template'))
+			->where('enabled = 1');
 
 		// Set the query and load the templates.
 		$db->setQuery($query);

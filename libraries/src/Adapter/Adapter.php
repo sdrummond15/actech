@@ -8,9 +8,8 @@
 
 namespace Joomla\CMS\Adapter;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Factory;
 use Joomla\CMS\Object\CMSObject;
 
 /**
@@ -58,7 +57,7 @@ class Adapter extends CMSObject
 	/**
 	 * Database Connector Object
 	 *
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * @var    \JDatabaseDriver
 	 * @since  1.6
 	 */
 	protected $_db;
@@ -75,16 +74,16 @@ class Adapter extends CMSObject
 	public function __construct($basepath, $classprefix = null, $adapterfolder = null)
 	{
 		$this->_basepath = $basepath;
-		$this->_classprefix = $classprefix ?: 'J';
-		$this->_adapterfolder = $adapterfolder ?: 'adapters';
+		$this->_classprefix = $classprefix ? $classprefix : 'J';
+		$this->_adapterfolder = $adapterfolder ? $adapterfolder : 'adapters';
 
-		$this->_db = Factory::getDbo();
+		$this->_db = \JFactory::getDbo();
 	}
 
 	/**
 	 * Get the database connector object
 	 *
-	 * @return  \Joomla\Database\DatabaseDriver  Database connector object
+	 * @return  \JDatabaseDriver  Database connector object
 	 *
 	 * @since   1.6
 	 */
@@ -121,9 +120,9 @@ class Adapter extends CMSObject
 	/**
 	 * Set an adapter by name
 	 *
-	 * @param   string  $name     Adapter name
-	 * @param   object  $adapter  Adapter object
-	 * @param   array   $options  Adapter options
+	 * @param   string  $name      Adapter name
+	 * @param   object  &$adapter  Adapter object
+	 * @param   array   $options   Adapter options
 	 *
 	 * @return  boolean  True if successful
 	 *
@@ -158,7 +157,7 @@ class Adapter extends CMSObject
 
 		$fullpath = $this->_basepath . '/' . $this->_adapterfolder . '/' . strtolower($name) . '.php';
 
-		if (!is_file($fullpath))
+		if (!file_exists($fullpath))
 		{
 			return false;
 		}
@@ -191,7 +190,7 @@ class Adapter extends CMSObject
 	{
 		$files = new \DirectoryIterator($this->_basepath . '/' . $this->_adapterfolder);
 
-		/** @type  $file  \DirectoryIterator */
+		/* @type  $file  \DirectoryIterator */
 		foreach ($files as $file)
 		{
 			$fileName = $file->getFilename();

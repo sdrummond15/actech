@@ -9,20 +9,12 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Http\HttpFactory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Plugin\PluginHelper;
-use Joomla\CMS\Session\Session;
-use Joomla\CMS\Uri\Uri;
-
 /**
  * Joomla! Two Factor Authentication using Yubikey Plugin
  *
  * @since  3.2
  */
-class PlgTwofactorauthYubikey extends CMSPlugin
+class PlgTwofactorauthYubikey extends JPlugin
 {
 	/**
 	 * Affects constructor behavior. If true, language files will be loaded automatically.
@@ -55,7 +47,7 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 
 		try
 		{
-			$app = Factory::getApplication();
+			$app = JFactory::getApplication();
 
 			if ($app->isClient('administrator'))
 			{
@@ -78,17 +70,17 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 
 		return (object) array(
 			'method' => $this->methodName,
-			'title'  => Text::_('PLG_TWOFACTORAUTH_YUBIKEY_METHOD_TITLE'),
+			'title'  => JText::_('PLG_TWOFACTORAUTH_YUBIKEY_METHOD_TITLE'),
 		);
 	}
 
 	/**
 	 * Shows the configuration page for this two factor authentication method.
 	 *
-	 * @param   object        $otpConfig  The two factor auth configuration object
-	 * @param   integer|null  $userId     The numeric user ID of the user whose form we'll display
+	 * @param   object   $otpConfig  The two factor auth configuration object
+	 * @param   integer  $userId     The numeric user ID of the user whose form we'll display
 	 *
-	 * @return  array
+	 * @return  boolean|string  False if the method is not ours, the HTML of the configuration page otherwise
 	 *
 	 * @see     UsersModelUser::getOtpConfig
 	 * @since   3.2
@@ -113,7 +105,18 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 		@ob_start();
 
 		// Include the form.php from a template override. If none is found use the default.
-		include_once PluginHelper::getLayoutPath('twofactorauth', 'yubikey', 'form');
+		$path = FOFPlatform::getInstance()->getTemplateOverridePath('plg_twofactorauth_yubikey', true);
+
+		JLoader::import('joomla.filesystem.file');
+
+		if (JFile::exists($path . '/form.php'))
+		{
+			include_once $path . '/form.php';
+		}
+		else
+		{
+			include_once __DIR__ . '/tmpl/form.php';
+		}
 
 		// Stop output buffering and get the form contents
 		$html = @ob_get_clean();
@@ -144,7 +147,7 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 		}
 
 		// Get a reference to the input data object
-		$input = Factory::getApplication()->input;
+		$input = JFactory::getApplication()->input;
 
 		// Load raw data
 		$rawData = $input->get('jform', array(), 'array');
@@ -161,7 +164,7 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 		{
 			try
 			{
-				Factory::getApplication()->enqueueMessage(Text::_('PLG_TWOFACTORAUTH_YUBIKEY_ERR_VALIDATIONFAILED'), 'error');
+				JFactory::getApplication()->enqueueMessage(JText::_('PLG_TWOFACTORAUTH_YUBIKEY_ERR_VALIDATIONFAILED'), 'error');
 			}
 			catch (Exception $exc)
 			{
@@ -177,7 +180,7 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 
 		if (!$check)
 		{
-			Factory::getApplication()->enqueueMessage(Text::_('PLG_TWOFACTORAUTH_YUBIKEY_ERR_VALIDATIONFAILED'), 'error');
+			JFactory::getApplication()->enqueueMessage(JText::_('PLG_TWOFACTORAUTH_YUBIKEY_ERR_VALIDATIONFAILED'), 'error');
 
 			// Check failed. Do not change two factor authentication settings.
 			return false;
@@ -190,9 +193,9 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 		$otpConfig    = (object) array(
 			'method'  => $this->methodName,
 			'config'  => array(
-				'yubikey' => $yubikey,
+				'yubikey' => $yubikey
 			),
-			'otep'    => array(),
+			'otep'    => array()
 		);
 
 		return $otpConfig;
@@ -270,13 +273,13 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 		$gotResponse = false;
 		$check       = false;
 
-		$token = Session::getFormToken();
+		$token = JSession::getFormToken();
 		$nonce = md5($token . uniqid(mt_rand()));
 
 		while (!$gotResponse && !empty($server_queue))
 		{
 			$server = array_shift($server_queue);
-			$uri    = new Uri('https://' . $server . '/wsapi/2.0/verify');
+			$uri    = new JUri('https://' . $server . '/wsapi/2.0/verify');
 
 			// I don't see where this ID is used?
 			$uri->setVar('id', 1);
@@ -292,12 +295,13 @@ class PlgTwofactorauthYubikey extends CMSPlugin
 			// servers must reply positively for the OTP to validate)
 			$uri->setVar('sl', 50);
 
-			// Timeout waiting for YubiCloud servers to reply: 5 seconds.
+			// Timeou waiting for YubiCloud servers to reply: 5 seconds.
 			$uri->setVar('timeout', 5);
 
 			try
 			{
-				$response = HttpFactory::getHttp()->get($uri->toString(), [], 6);
+				$http     = JHttpFactory::getHttp();
+				$response = $http->get($uri->toString(), null, 6);
 
 				if (!empty($response))
 				{

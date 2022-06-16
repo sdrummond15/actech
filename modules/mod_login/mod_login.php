@@ -9,21 +9,15 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Helper\AuthenticationHelper;
-use Joomla\CMS\Helper\ModuleHelper;
-use Joomla\Module\Login\Site\Helper\LoginHelper;
+// Include the login functions only once
+JLoader::register('ModLoginHelper', __DIR__ . '/helper.php');
 
 $params->def('greeting', 1);
 
-// HTML IDs
-$formId           = 'login-form-' . $module->id;
-$type             = LoginHelper::getType();
-$return           = LoginHelper::getReturnUrl($params, $type);
-$registerLink     = LoginHelper::getRegistrationUrl($params);
-$twofactormethods = AuthenticationHelper::getTwoFactorMethods();
-$extraButtons     = AuthenticationHelper::getLoginButtons($formId);
-$user             = Factory::getUser();
+$type             = ModLoginHelper::getType();
+$return           = ModLoginHelper::getReturnUrl($params, $type);
+$twofactormethods = JAuthenticationHelper::getTwoFactorMethods();
+$user             = JFactory::getUser();
 $layout           = $params->get('layout', 'default');
 
 // Logged users must load the logout sublayout
@@ -32,4 +26,4 @@ if (!$user->guest)
 	$layout .= '_logout';
 }
 
-require ModuleHelper::getLayoutPath('mod_login', $layout);
+require JModuleHelper::getLayoutPath('mod_login', $layout);

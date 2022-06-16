@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Object;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Joomla Platform Object Class
@@ -17,7 +17,7 @@ namespace Joomla\CMS\Object;
  * and an internal error handler.
  *
  * @since       1.7.0
- * @deprecated  4.0.0  Use \stdClass or \Joomla\Registry\Registry instead.
+ * @deprecated  4.0
  */
 class CMSObject
 {
@@ -26,7 +26,8 @@ class CMSObject
 	 *
 	 * @var    array
 	 * @since  1.7.0
-	 * @deprecated  3.1.4  JError has been deprecated
+	 * @see    JError
+	 * @deprecated  12.3  JError has been deprecated
 	 */
 	protected $_errors = array();
 
@@ -52,11 +53,11 @@ class CMSObject
 	 * @return  string  The classname.
 	 *
 	 * @since   1.7.0
-	 * @deprecated 3.1.4  Classes should provide their own __toString() implementation.
+	 * @deprecated 12.3  Classes should provide their own __toString() implementation.
 	 */
 	public function __toString()
 	{
-		return \get_class($this);
+		return get_class($this);
 	}
 
 	/**
@@ -131,12 +132,13 @@ class CMSObject
 	 * Get the most recent error message.
 	 *
 	 * @param   integer  $i         Option error index.
-	 * @param   boolean  $toString  Indicates if Exception objects should return their error message.
+	 * @param   boolean  $toString  Indicates if JError objects should return their error message.
 	 *
 	 * @return  string   Error message
 	 *
 	 * @since   1.7.0
-	 * @deprecated 3.1.4  JError has been deprecated
+	 * @see     JError
+	 * @deprecated 12.3  JError has been deprecated
 	 */
 	public function getError($i = null, $toString = true)
 	{
@@ -146,7 +148,7 @@ class CMSObject
 			// Default, return the last message
 			$error = end($this->_errors);
 		}
-		elseif (!\array_key_exists($i, $this->_errors))
+		elseif (!array_key_exists($i, $this->_errors))
 		{
 			// If $i has been specified but does not exist, return false
 			return false;
@@ -168,10 +170,11 @@ class CMSObject
 	/**
 	 * Return all errors, if any.
 	 *
-	 * @return  array  Array of error messages.
+	 * @return  array  Array of error messages or JErrors.
 	 *
 	 * @since   1.7.0
-	 * @deprecated 3.1.4  JError has been deprecated
+	 * @see     JError
+	 * @deprecated 12.3  JError has been deprecated
 	 */
 	public function getErrors()
 	{
@@ -190,7 +193,7 @@ class CMSObject
 	 */
 	public function set($property, $value = null)
 	{
-		$previous = $this->$property ?? null;
+		$previous = isset($this->$property) ? $this->$property : null;
 		$this->$property = $value;
 
 		return $previous;
@@ -209,7 +212,7 @@ class CMSObject
 	 */
 	public function setProperties($properties)
 	{
-		if (\is_array($properties) || \is_object($properties))
+		if (is_array($properties) || is_object($properties))
 		{
 			foreach ((array) $properties as $k => $v)
 			{
@@ -231,7 +234,8 @@ class CMSObject
 	 * @return  void
 	 *
 	 * @since   1.7.0
-	 * @deprecated 3.1.4  JError has been deprecated
+	 * @see     JError
+	 * @deprecated 12.3  JError has been deprecated
 	 */
 	public function setError($error)
 	{

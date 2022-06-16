@@ -8,10 +8,7 @@
 
 namespace Joomla\CMS\Cache;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Path;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Public cache handler
@@ -71,7 +68,7 @@ class CacheController
 	 */
 	public function __call($name, $arguments)
 	{
-		return \call_user_func_array(array($this->cache, $name), $arguments);
+		return call_user_func_array(array($this->cache, $name), $arguments);
 	}
 
 	/**
@@ -82,55 +79,42 @@ class CacheController
 	 *
 	 * @return  CacheController
 	 *
-	 * @since       1.7.0
-	 * @throws      \RuntimeException
-	 * @deprecated  5.0 Use the cache controller factory instead
+	 * @since   1.7.0
+	 * @throws  \RuntimeException
 	 */
 	public static function getInstance($type = 'output', $options = array())
 	{
-		@trigger_error(
-			sprintf(
-				'%s() is deprecated. The cache controller should be fetched from the factory.',
-				__METHOD__
-			),
-			E_USER_DEPRECATED
-		);
+		self::addIncludePath(__DIR__ . '/Controller');
 
-		try
+		$type = strtolower(preg_replace('/[^A-Z0-9_\.-]/i', '', $type));
+
+		$class = __NAMESPACE__ . '\\Controller\\' . ucfirst($type) . 'Controller';
+
+		if (!class_exists($class))
 		{
-			return Factory::getContainer()->get(CacheControllerFactoryInterface::class)->createCacheController($type, $options);
-		}
-		catch (\RuntimeException $e)
-		{
-			$type  = strtolower(preg_replace('/[^A-Z0-9_\.-]/i', '', $type));
 			$class = 'JCacheController' . ucfirst($type);
+		}
 
-			if (!class_exists($class))
+		if (!class_exists($class))
+		{
+			// Search for the class file in the Cache include paths.
+			\JLoader::import('joomla.filesystem.path');
+
+			$path = \JPath::find(self::addIncludePath(), strtolower($type) . '.php');
+
+			if ($path !== false)
 			{
-				// Search for the class file in the Cache include paths.
-				$path = Path::find(self::addIncludePath(), strtolower($type) . '.php');
-
-				if ($path !== false)
-				{
-					\JLoader::register($class, $path);
-				}
-
-				// The class should now be loaded
-				if (!class_exists($class))
-				{
-					throw new \RuntimeException('Unable to load Cache Controller: ' . $type, 500);
-				}
-
-				// Only trigger a deprecation notice if the file and class are found
-				@trigger_error(
-					'Support for including cache controllers using path lookup is deprecated and will be removed in 5.0.'
-					. ' Use a custom cache controller factory instead.',
-					E_USER_DEPRECATED
-				);
+				\JLoader::register($class, $path);
 			}
 
-			return new $class($options);
+			// The class should now be loaded
+			if (!class_exists($class))
+			{
+				throw new \RuntimeException('Unable to load Cache Controller: ' . $type, 500);
+			}
 		}
+
+		return new $class($options);
 	}
 
 	/**
@@ -140,8 +124,7 @@ class CacheController
 	 *
 	 * @return  array  An array with directory elements
 	 *
-	 * @since       1.7.0
-	 * @deprecated  5.0 Use the cache controller factory instead
+	 * @since   1.7.0
 	 */
 	public static function addIncludePath($path = '')
 	{
@@ -152,18 +135,86 @@ class CacheController
 			$paths = array();
 		}
 
-		if (!empty($path) && !\in_array($path, $paths))
+		if (!empty($path) && !in_array($path, $paths))
 		{
-			// Only trigger a deprecation notice when adding a lookup path
-			@trigger_error(
-				'Support for including cache controllers using path lookup is deprecated and will be removed in 5.0.'
-				. ' Use a custom cache controller factory instead.',
-				E_USER_DEPRECATED
-			);
-
-			array_unshift($paths, Path::clean($path));
+			\JLoader::import('joomla.filesystem.path');
+			array_unshift($paths, \JPath::clean($path));
 		}
 
 		return $paths;
+	}
+
+	/**
+	 * Get stored cached data by ID and group
+	 *
+	 * @param   string  $id     The cache data ID
+	 * @param   string  $group  The cache data group
+	 *
+	 * @return  mixed  Boolean false on no result, cached object otherwise
+	 *
+	 * @since   1.7.0
+	 * @deprecated  4.0  Implement own method in subclass
+	 */
+	public function get($id, $group = null)
+	{
+		$data = $this->cache->get($id, $group);
+
+		if ($data === false)
+		{
+			$locktest = $this->cache->lock($id, $group);
+
+			// If locklooped is true try to get the cached data again; it could exist now.
+			if ($locktest->locked === true && $locktest->locklooped === true)
+			{
+				$data = $this->cache->get($id, $group);
+			}
+
+			if ($locktest->locked === true)
+			{
+				$this->cache->unlock($id, $group);
+			}
+		}
+
+		// Check again because we might get it from second attempt
+		if ($data !== false)
+		{
+			// Trim to fix unserialize errors
+			$data = unserialize(trim($data));
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Store data to cache by ID and group
+	 *
+	 * @param   mixed    $data        The data to store
+	 * @param   string   $id          The cache data ID
+	 * @param   string   $group       The cache data group
+	 * @param   boolean  $wrkarounds  True to use wrkarounds
+	 *
+	 * @return  boolean  True if cache stored
+	 *
+	 * @since   1.7.0
+	 * @deprecated  4.0  Implement own method in subclass
+	 */
+	public function store($data, $id, $group = null, $wrkarounds = true)
+	{
+		$locktest = $this->cache->lock($id, $group);
+
+		if ($locktest->locked === false && $locktest->locklooped === true)
+		{
+			// We can not store data because another process is in the middle of saving
+			return false;
+		}
+
+		$result = $this->cache->store(serialize($data), $id, $group);
+
+		if ($locktest->locked === true)
+		{
+			$this->cache->unlock($id, $group);
+		}
+
+		return $result;
 	}
 }

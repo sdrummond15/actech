@@ -8,10 +8,10 @@
 
 namespace Joomla\CMS\Crypt\Cipher;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\Crypt\CipherInterface;
-use Joomla\Crypt\Key;
+use Joomla\CMS\Crypt\CipherInterface;
+use Joomla\CMS\Crypt\Key;
 use ParagonIE\Sodium\Compat;
 
 /**
@@ -43,9 +43,9 @@ class SodiumCipher implements CipherInterface
 	public function decrypt($data, Key $key)
 	{
 		// Validate key.
-		if ($key->getType() !== 'sodium')
+		if ($key->type !== 'sodium')
 		{
-			throw new \InvalidArgumentException('Invalid key of type: ' . $key->getType() . '.  Expected sodium.');
+			throw new \InvalidArgumentException('Invalid key of type: ' . $key->type . '.  Expected sodium.');
 		}
 
 		if (!$this->nonce)
@@ -56,7 +56,7 @@ class SodiumCipher implements CipherInterface
 		$decrypted = Compat::crypto_box_open(
 			$data,
 			$this->nonce,
-			Compat::crypto_box_keypair_from_secretkey_and_publickey($key->getPrivate(), $key->getPublic())
+			Compat::crypto_box_keypair_from_secretkey_and_publickey($key->private, $key->public)
 		);
 
 		if ($decrypted === false)
@@ -81,9 +81,9 @@ class SodiumCipher implements CipherInterface
 	public function encrypt($data, Key $key)
 	{
 		// Validate key.
-		if ($key->getType() !== 'sodium')
+		if ($key->type !== 'sodium')
 		{
-			throw new \InvalidArgumentException('Invalid key of type: ' . $key->getType() . '.  Expected sodium.');
+			throw new \InvalidArgumentException('Invalid key of type: ' . $key->type . '.  Expected sodium.');
 		}
 
 		if (!$this->nonce)
@@ -94,7 +94,7 @@ class SodiumCipher implements CipherInterface
 		return Compat::crypto_box(
 			$data,
 			$this->nonce,
-			Compat::crypto_box_keypair_from_secretkey_and_publickey($key->getPrivate(), $key->getPublic())
+			Compat::crypto_box_keypair_from_secretkey_and_publickey($key->private, $key->public)
 		);
 	}
 
@@ -106,26 +106,20 @@ class SodiumCipher implements CipherInterface
 	 * @return  Key
 	 *
 	 * @since   3.8.0
-	 * @throws  \RuntimeException
+	 * @throws  RuntimeException
 	 */
 	public function generateKey(array $options = array())
 	{
+		// Create the new encryption key object.
+		$key = new Key('sodium');
+
 		// Generate the encryption key.
 		$pair = Compat::crypto_box_keypair();
 
-		return new Key('sodium', Compat::crypto_box_secretkey($pair), Compat::crypto_box_publickey($pair));
-	}
+		$key->public  = Compat::crypto_box_publickey($pair);
+		$key->private = Compat::crypto_box_secretkey($pair);
 
-	/**
-	 * Check if the cipher is supported in this environment.
-	 *
-	 * @return  boolean
-	 *
-	 * @since   4.0.0
-	 */
-	public static function isSupported(): bool
-	{
-		return class_exists(Compat::class);
+		return $key;
 	}
 
 	/**

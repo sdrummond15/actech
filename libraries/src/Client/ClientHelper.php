@@ -8,9 +8,7 @@
 
 namespace Joomla\CMS\Client;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Factory;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Client helper class
@@ -39,19 +37,19 @@ class ClientHelper
 
 		if (!isset($credentials[$client]) || $force)
 		{
-			$app = Factory::getApplication();
+			$config = \JFactory::getConfig();
 
 			// Fetch the client layer configuration options for the specific client
 			switch ($client)
 			{
 				case 'ftp':
 					$options = array(
-						'enabled' => $app->get('ftp_enable'),
-						'host'    => $app->get('ftp_host'),
-						'port'    => $app->get('ftp_port'),
-						'user'    => $app->get('ftp_user'),
-						'pass'    => $app->get('ftp_pass'),
-						'root'    => $app->get('ftp_root'),
+						'enabled' => $config->get('ftp_enable'),
+						'host' => $config->get('ftp_host'),
+						'port' => $config->get('ftp_port'),
+						'user' => $config->get('ftp_user'),
+						'pass' => $config->get('ftp_pass'),
+						'root' => $config->get('ftp_root'),
 					);
 					break;
 
@@ -63,7 +61,7 @@ class ClientHelper
 			// If user and pass are not set in global config lets see if they are in the session
 			if ($options['enabled'] == true && ($options['user'] == '' || $options['pass'] == ''))
 			{
-				$session = Factory::getSession();
+				$session = \JFactory::getSession();
 				$options['user'] = $session->get($client . '.user', null, 'JClientHelper');
 				$options['pass'] = $session->get($client . '.pass', null, 'JClientHelper');
 			}
@@ -101,8 +99,8 @@ class ClientHelper
 		switch ($client)
 		{
 			case 'ftp':
-				$app = Factory::getApplication();
-				$options = array('enabled' => $app->get('ftp_enable'), 'host' => $app->get('ftp_host'), 'port' => $app->get('ftp_port'));
+				$config = \JFactory::getConfig();
+				$options = array('enabled' => $config->get('ftp_enable'), 'host' => $config->get('ftp_host'), 'port' => $config->get('ftp_port'));
 
 				if ($options['enabled'])
 				{
@@ -128,7 +126,7 @@ class ClientHelper
 		if ($return)
 		{
 			// Save valid credentials to the session
-			$session = Factory::getSession();
+			$session = \JFactory::getSession();
 			$session->set($client . '.user', $user, 'JClientHelper');
 			$session->set($client . '.pass', $pass, 'JClientHelper');
 
@@ -157,8 +155,8 @@ class ClientHelper
 		switch ($client)
 		{
 			case 'ftp':
-				$app = Factory::getApplication();
-				$options = array('enabled' => $app->get('ftp_enable'), 'user' => $app->get('ftp_user'), 'pass' => $app->get('ftp_pass'));
+				$config = \JFactory::getConfig();
+				$options = array('enabled' => $config->get('ftp_enable'), 'user' => $config->get('ftp_user'), 'pass' => $config->get('ftp_pass'));
 				break;
 
 			default:
@@ -179,7 +177,7 @@ class ClientHelper
 		else
 		{
 			// Check if login credentials are available in the session
-			$session = Factory::getSession();
+			$session = \JFactory::getSession();
 			$user = $session->get($client . '.user', null, 'JClientHelper');
 			$pass = $session->get($client . '.pass', null, 'JClientHelper');
 
@@ -201,7 +199,7 @@ class ClientHelper
 	 *
 	 * @param   string  $client  The name of the client.
 	 *
-	 * @return  boolean  True if credentials are present
+	 * @return  mixed  True, if FTP settings; JError if using legacy tree.
 	 *
 	 * @since   1.7.0
 	 * @throws  \InvalidArgumentException if credentials invalid
@@ -209,19 +207,28 @@ class ClientHelper
 	public static function setCredentialsFromRequest($client)
 	{
 		// Determine whether FTP credentials have been passed along with the current request
-		$input = Factory::getApplication()->input;
+		$input = \JFactory::getApplication()->input;
 		$user = $input->post->getString('username', null);
 		$pass = $input->post->getString('password', null);
 
 		if ($user != '' && $pass != '')
 		{
 			// Add credentials to the session
-			if (!self::setCredentials($client, $user, $pass))
+			if (self::setCredentials($client, $user, $pass))
 			{
-				throw new \InvalidArgumentException('Invalid user credentials');
+				$return = false;
 			}
-
-			$return = false;
+			else
+			{
+				if (class_exists('JError'))
+				{
+					$return = \JError::raiseWarning(500, \JText::_('JLIB_CLIENT_ERROR_HELPER_SETCREDENTIALSFROMREQUEST_FAILED'));
+				}
+				else
+				{
+					throw new \InvalidArgumentException('Invalid user credentials');
+				}
+			}
 		}
 		else
 		{

@@ -8,17 +8,13 @@
 
 namespace Joomla\CMS\Mail;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Router\Route;
-use Joomla\CMS\String\PunycodeHelper;
-use Joomla\CMS\Uri\Uri;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Email helper class, provides static methods to perform various tasks relevant
  * to the Joomla email routines.
  *
- * @todo: Test these methods as the regex work is first run and not tested thoroughly
+ * TODO: Test these methods as the regex work is first run and not tested thoroughly
  *
  * @since  1.7.0
  */
@@ -35,7 +31,7 @@ abstract class MailHelper
 	 */
 	public static function cleanLine($value)
 	{
-		$value = PunycodeHelper::emailToPunycode($value);
+		$value = \JStringPunycode::emailToPunycode($value);
 
 		return trim(preg_replace('/(%0A|%0D|\n+|\r+)/i', '', $value));
 	}
@@ -119,7 +115,7 @@ abstract class MailHelper
 		$local = substr($email, 0, $atIndex);
 
 		// Check Length of domain
-		$domainLen = \strlen($domain);
+		$domainLen = strlen($domain);
 
 		if ($domainLen < 1 || $domainLen > 255)
 		{
@@ -135,7 +131,7 @@ abstract class MailHelper
 		$allowed = "a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-";
 		$regex = "/^[$allowed][\.$allowed]{0,63}$/";
 
-		if (!preg_match($regex, $local) || substr($local, -1) === '.' || $local[0] === '.' || preg_match('/\.\./', $local))
+		if (!preg_match($regex, $local) || substr($local, -1) == '.' || $local[0] == '.' || preg_match('/\.\./', $local))
 		{
 			return false;
 		}
@@ -149,7 +145,7 @@ abstract class MailHelper
 		}
 
 		// Check Lengths
-		$localLen = \strlen($local);
+		$localLen = strlen($local);
 
 		if ($localLen < 1 || $localLen > 64)
 		{
@@ -163,7 +159,7 @@ abstract class MailHelper
 		foreach ($domain_array as $domain)
 		{
 			// Convert domain to punycode
-			$domain = PunycodeHelper::toPunycode($domain);
+			$domain = \JStringPunycode::toPunycode($domain);
 
 			// Must be something
 			if (!$domain)
@@ -184,7 +180,7 @@ abstract class MailHelper
 			}
 
 			// Check for a dash at the end of the domain
-			$length = \strlen($domain) - 1;
+			$length = strlen($domain) - 1;
 
 			if (strpos($domain, '-', $length) === $length)
 			{
@@ -193,89 +189,5 @@ abstract class MailHelper
 		}
 
 		return true;
-	}
-
-	/**
-	 * Convert relative (links, images sources) to absolute urls so that content is accessible in email
-	 *
-	 * @param   string  $content  The content need to convert
-	 *
-	 * @return  string  The converted content which the relative urls are converted to absolute urls
-	 *
-	 * @since  4.1.0
-	 */
-	public static function convertRelativeToAbsoluteUrls($content)
-	{
-		$siteUrl = Uri::root();
-
-		// Replace none SEF URLs by absolute SEF URLs
-		if (strpos($content, 'href="index.php?') !== false)
-		{
-			preg_match_all('#href="index.php\?([^"]+)"#m', $content, $matches);
-
-			foreach ($matches[1] as $urlQueryString)
-			{
-				$content = str_replace(
-					'href="index.php?' . $urlQueryString . '"',
-					'href="' . Route::link('site', 'index.php?' . $urlQueryString, Route::TLS_IGNORE, true) . '"',
-					$content
-				);
-			}
-
-			self::checkContent($content);
-		}
-
-		// Replace relative links, image sources with absolute Urls
-		$protocols  = '[a-zA-Z0-9\-]+:';
-		$attributes = array('href=', 'src=', 'poster=');
-
-		foreach ($attributes as $attribute)
-		{
-			if (strpos($content, $attribute) !== false)
-			{
-				$regex = '#\s' . $attribute . '"(?!/|' . $protocols . '|\#|\')([^"]*)"#m';
-
-				$content = preg_replace($regex, ' ' . $attribute . '"' . $siteUrl . '$1"', $content);
-
-				self::checkContent($content);
-			}
-		}
-
-		return $content;
-	}
-
-	/**
-	 * Check the content after regular expression function call.
-	 *
-	 * @param   string  $content  Content to be checked.
-	 *
-	 * @return  void
-	 *
-	 * @throws  \RuntimeException  If there is an error in previous regular expression function call.
-	 * @since  4.1.0
-	 */
-	private static function checkContent($content)
-	{
-		if ($content !== null)
-		{
-			return;
-		}
-
-		switch (preg_last_error())
-		{
-			case PREG_BACKTRACK_LIMIT_ERROR:
-				$message = 'PHP regular expression limit reached (pcre.backtrack_limit)';
-				break;
-			case PREG_RECURSION_LIMIT_ERROR:
-				$message = 'PHP regular expression limit reached (pcre.recursion_limit)';
-				break;
-			case PREG_BAD_UTF8_ERROR:
-				$message = 'Bad UTF8 passed to PCRE function';
-				break;
-			default:
-				$message = 'Unknown PCRE error calling PCRE function';
-		}
-
-		throw new \RuntimeException($message);
 	}
 }

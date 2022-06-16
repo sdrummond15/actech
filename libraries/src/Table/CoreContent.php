@@ -8,15 +8,11 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Helper\ContentHelper;
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
-use Joomla\Database\ParameterType;
+use Joomla\Registry\Registry;
 use Joomla\String\StringHelper;
+use Joomla\Utilities\ArrayHelper;
 
 /**
  * Core content table
@@ -26,35 +22,62 @@ use Joomla\String\StringHelper;
 class CoreContent extends Table
 {
 	/**
-	 * Indicates that columns fully support the NULL value in the database
-	 *
-	 * @var    boolean
-	 * @since  4.0.0
-	 */
-	protected $_supportNullValue = true;
-
-	/**
-	 * Encode necessary fields to JSON in the bind method
-	 *
-	 * @var    array
-	 * @since  4.0.0
-	 */
-	protected $_jsonEncode = ['core_params', 'core_metadata', 'core_images', 'core_urls', 'core_body'];
-
-	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  A database connector object
+	 * @param   \JDatabaseDriver  $db  A database connector object
 	 *
 	 * @since   3.1
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct($db)
 	{
 		parent::__construct('#__ucm_content', 'core_content_id', $db);
+	}
 
-		$this->setColumnAlias('published', 'core_state');
-		$this->setColumnAlias('checked_out', 'core_checked_out_user_id');
-		$this->setColumnAlias('checked_out_time', 'core_checked_out_time');
+	/**
+	 * Overloaded bind function
+	 *
+	 * @param   array  $array   Named array
+	 * @param   mixed  $ignore  An optional array or space separated list of properties
+	 *                          to ignore while binding.
+	 *
+	 * @return  mixed  Null if operation was satisfactory, otherwise returns an error string
+	 *
+	 * @see     Table::bind()
+	 * @since   3.1
+	 */
+	public function bind($array, $ignore = '')
+	{
+		if (isset($array['core_params']) && is_array($array['core_params']))
+		{
+			$registry = new Registry($array['core_params']);
+			$array['core_params'] = (string) $registry;
+		}
+
+		if (isset($array['core_metadata']) && is_array($array['core_metadata']))
+		{
+			$registry = new Registry($array['core_metadata']);
+			$array['core_metadata'] = (string) $registry;
+		}
+
+		if (isset($array['core_images']) && is_array($array['core_images']))
+		{
+			$registry = new Registry($array['core_images']);
+			$array['core_images'] = (string) $registry;
+		}
+
+		if (isset($array['core_urls']) && is_array($array['core_urls']))
+		{
+			$registry = new Registry($array['core_urls']);
+			$array['core_urls'] = (string) $registry;
+		}
+
+		if (isset($array['core_body']) && is_array($array['core_body']))
+		{
+			$registry = new Registry($array['core_body']);
+			$array['core_body'] = (string) $registry;
+		}
+
+		return parent::bind($array, $ignore);
 	}
 
 	/**
@@ -67,20 +90,9 @@ class CoreContent extends Table
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		if (trim($this->core_title) === '')
 		{
-			$this->setError(Text::_('JLIB_CMS_WARNING_PROVIDE_VALID_NAME'));
+			$this->setError(\JText::_('JLIB_CMS_WARNING_PROVIDE_VALID_NAME'));
 
 			return false;
 		}
@@ -90,11 +102,11 @@ class CoreContent extends Table
 			$this->core_alias = $this->core_title;
 		}
 
-		$this->core_alias = ApplicationHelper::stringURLSafe($this->core_alias);
+		$this->core_alias = \JApplicationHelper::stringURLSafe($this->core_alias);
 
 		if (trim(str_replace('-', '', $this->core_alias)) === '')
 		{
-			$this->core_alias = Factory::getDate()->format('Y-m-d-H-i-s');
+			$this->core_alias = \JFactory::getDate()->format('Y-m-d-H-i-s');
 		}
 
 		// Not Null sanity check
@@ -109,10 +121,7 @@ class CoreContent extends Table
 		}
 
 		// Check the publish down date is not earlier than publish up.
-		if ($this->core_publish_up !== null
-			&& $this->core_publish_down !== null
-			&& $this->core_publish_down < $this->core_publish_up
-			&& $this->core_publish_down > $this->_db->getNullDate())
+		if ($this->core_publish_down < $this->core_publish_up && $this->core_publish_down > $this->_db->getNullDate())
 		{
 			// Swap the dates.
 			$temp = $this->core_publish_up;
@@ -183,9 +192,7 @@ class CoreContent extends Table
 	 */
 	public function deleteByContentId($contentItemId = null, $typeAlias = null)
 	{
-		$contentItemId = (int) $contentItemId;
-
-		if ($contentItemId === 0)
+		if ($contentItemId === null || ((int) $contentItemId) === 0)
 		{
 			throw new \UnexpectedValueException('Null content item key not allowed.');
 		}
@@ -199,15 +206,8 @@ class CoreContent extends Table
 		$query = $db->getQuery(true);
 		$query->select($db->quoteName('core_content_id'))
 			->from($db->quoteName('#__ucm_content'))
-			->where(
-				[
-					$db->quoteName('core_content_item_id') . ' = :contentItemId',
-					$db->quoteName('core_type_alias') . ' = :typeAlias',
-				]
-			)
-			->bind(':contentItemId', $contentItemId, ParameterType::INTEGER)
-			->bind(':typeAlias', $typeAlias);
-
+			->where($db->quoteName('core_content_item_id') . ' = ' . (int) $contentItemId)
+			->where($db->quoteName('core_type_alias') . ' = ' . $db->quote($typeAlias));
 		$db->setQuery($query);
 
 		if ($ucmId = $db->loadResult())
@@ -229,10 +229,10 @@ class CoreContent extends Table
 	 *
 	 * @since   3.1
 	 */
-	public function store($updateNulls = true)
+	public function store($updateNulls = false)
 	{
-		$date = Factory::getDate();
-		$user = Factory::getUser();
+		$date = \JFactory::getDate();
+		$user = \JFactory::getUser();
 
 		if ($this->core_content_id)
 		{
@@ -253,16 +253,6 @@ class CoreContent extends Table
 			if (empty($this->core_created_user_id))
 			{
 				$this->core_created_user_id = $user->get('id');
-			}
-
-			if (!(int) $this->core_modified_time)
-			{
-				$this->core_modified_time = $this->core_created_time;
-			}
-
-			if (empty($this->core_modified_user_id))
-			{
-				$this->core_modified_user_id = $this->core_created_user_id;
 			}
 
 			$isNew = true;
@@ -290,63 +280,136 @@ class CoreContent extends Table
 	 *
 	 * @since   3.1
 	 */
-	protected function storeUcmBase($updateNulls = true, $isNew = false)
+	protected function storeUcmBase($updateNulls = false, $isNew = false)
 	{
 		// Store the ucm_base row
 		$db         = $this->getDbo();
 		$query      = $db->getQuery(true);
-		$languageId = ContentHelper::getLanguageId($this->core_language);
+		$languageId = \JHelperContent::getLanguageId($this->core_language);
 
 		// Selecting "all languages" doesn't give a language id - we can't store a blank string in non mysql databases, so save 0 (the default value)
 		if (!$languageId)
 		{
-			$languageId = 0;
+			$languageId = '0';
 		}
 
 		if ($isNew)
 		{
 			$query->insert($db->quoteName('#__ucm_base'))
-				->columns(
-					[
-						$db->quoteName('ucm_id'),
-						$db->quoteName('ucm_item_id'),
-						$db->quoteName('ucm_type_id'),
-						$db->quoteName('ucm_language_id'),
-					]
-				)
+				->columns(array($db->quoteName('ucm_id'), $db->quoteName('ucm_item_id'), $db->quoteName('ucm_type_id'), $db->quoteName('ucm_language_id')))
 				->values(
-					implode(
-						',',
-						$query->bindArray(
-							[
-								$this->core_content_id,
-								$this->core_content_item_id,
-								$this->core_type_id,
-								$languageId,
-							]
-						)
-					)
-				);
+					$db->quote($this->core_content_id) . ', '
+					. $db->quote($this->core_content_item_id) . ', '
+					. $db->quote($this->core_type_id) . ', '
+					. $db->quote($languageId)
+			);
 		}
 		else
 		{
 			$query->update($db->quoteName('#__ucm_base'))
-				->set(
-					[
-						$db->quoteName('ucm_item_id') . ' = :coreContentItemId',
-						$db->quoteName('ucm_type_id') . ' = :typeId',
-						$db->quoteName('ucm_language_id') . ' = :languageId',
-					]
-				)
-				->where($db->quoteName('ucm_id') . ' = :coreContentId')
-				->bind(':coreContentItemId', $this->core_content_item_id, ParameterType::INTEGER)
-				->bind(':typeId', $this->core_type_id, ParameterType::INTEGER)
-				->bind(':languageId', $languageId, ParameterType::INTEGER)
-				->bind(':coreContentId', $this->core_content_id, ParameterType::INTEGER);
+				->set($db->quoteName('ucm_item_id') . ' = ' . $db->quote($this->core_content_item_id))
+				->set($db->quoteName('ucm_type_id') . ' = ' . $db->quote($this->core_type_id))
+				->set($db->quoteName('ucm_language_id') . ' = ' . $db->quote($languageId))
+				->where($db->quoteName('ucm_id') . ' = ' . $db->quote($this->core_content_id));
 		}
 
 		$db->setQuery($query);
 
 		return $db->execute();
+	}
+
+	/**
+	 * Method to set the publishing state for a row or list of rows in the database
+	 * table. The method respects checked out rows by other users and will attempt
+	 * to checkin rows that it can after adjustments are made.
+	 *
+	 * @param   mixed    $pks     An optional array of primary key values to update.  If not set the instance property value is used.
+	 * @param   integer  $state   The publishing state. eg. [0 = unpublished, 1 = published]
+	 * @param   integer  $userId  The user id of the user performing the operation.
+	 *
+	 * @return  boolean  True on success.
+	 *
+	 * @since   3.1
+	 */
+	public function publish($pks = null, $state = 1, $userId = 0)
+	{
+		$k = $this->_tbl_key;
+
+		// Sanitize input.
+		$pks    = ArrayHelper::toInteger($pks);
+		$userId = (int) $userId;
+		$state  = (int) $state;
+
+		// If there are no primary keys set check to see if the instance key is set.
+		if (empty($pks))
+		{
+			if ($this->$k)
+			{
+				$pks = array($this->$k);
+			}
+			// Nothing to set publishing state on, return false.
+			else
+			{
+				$this->setError(\JText::_('JLIB_DATABASE_ERROR_NO_ROWS_SELECTED'));
+
+				return false;
+			}
+		}
+
+		$pksImploded = implode(',', $pks);
+
+		// Get the JDatabaseQuery object
+		$query = $this->_db->getQuery(true);
+
+		// Update the publishing state for rows with the given primary keys.
+		$query->update($this->_db->quoteName($this->_tbl))
+			->set($this->_db->quoteName('core_state') . ' = ' . (int) $state)
+			->where($this->_db->quoteName($k) . 'IN (' . $pksImploded . ')');
+
+		// Determine if there is checkin support for the table.
+		$checkin = false;
+
+		if (property_exists($this, 'core_checked_out_user_id') && property_exists($this, 'core_checked_out_time'))
+		{
+			$checkin = true;
+			$query->where(
+				' ('
+				. $this->_db->quoteName('core_checked_out_user_id') . ' = 0 OR ' . $this->_db->quoteName('core_checked_out_user_id') . ' = ' . (int) $userId
+				. ')'
+			);
+		}
+
+		$this->_db->setQuery($query);
+
+		try
+		{
+			$this->_db->execute();
+		}
+		catch (\RuntimeException $e)
+		{
+			$this->setError($e->getMessage());
+
+			return false;
+		}
+
+		// If checkin is supported and all rows were adjusted, check them in.
+		if ($checkin && count($pks) === $this->_db->getAffectedRows())
+		{
+			// Checkin the rows.
+			foreach ($pks as $pk)
+			{
+				$this->checkin($pk);
+			}
+		}
+
+		// If the JTable instance value is in the list of primary keys that were set, set the instance.
+		if (in_array($this->$k, $pks))
+		{
+			$this->core_state = $state;
+		}
+
+		$this->setError('');
+
+		return true;
 	}
 }

@@ -8,9 +8,7 @@
 
 namespace Joomla\CMS\Component\Router;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Factory;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Base component routing class
@@ -22,7 +20,7 @@ abstract class RouterBase implements RouterInterface
 	/**
 	 * Application object to use in the router
 	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * @var    \JApplicationCms
 	 * @since  3.4
 	 */
 	public $app;
@@ -30,7 +28,7 @@ abstract class RouterBase implements RouterInterface
 	/**
 	 * Menu object to use in the router
 	 *
-	 * @var    \Joomla\CMS\Menu\AbstractMenu
+	 * @var    \JMenu
 	 * @since  3.4
 	 */
 	public $menu;
@@ -38,8 +36,8 @@ abstract class RouterBase implements RouterInterface
 	/**
 	 * Class constructor.
 	 *
-	 * @param   \Joomla\CMS\Application\CMSApplication  $app   Application-object that the router should use
-	 * @param   \Joomla\CMS\Menu\AbstractMenu           $menu  Menu-object that the router should use
+	 * @param   \JApplicationCms  $app   Application-object that the router should use
+	 * @param   \JMenu            $menu  Menu-object that the router should use
 	 *
 	 * @since   3.4
 	 */
@@ -51,7 +49,7 @@ abstract class RouterBase implements RouterInterface
 		}
 		else
 		{
-			$this->app = Factory::getApplication();
+			$this->app = \JFactory::getApplication('site');
 		}
 
 		if ($menu)

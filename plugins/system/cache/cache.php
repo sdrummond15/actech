@@ -9,24 +9,17 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Cache\Cache;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Plugin\PluginHelper;
-use Joomla\CMS\Profiler\Profiler;
-use Joomla\CMS\Uri\Uri;
-
 /**
  * Joomla! Page Cache Plugin.
  *
  * @since  1.5
  */
-class PlgSystemCache extends CMSPlugin
+class PlgSystemCache extends JPlugin
 {
 	/**
 	 * Cache instance.
 	 *
-	 * @var    \Joomla\CMS\Cache\CacheController
+	 * @var    JCache
 	 * @since  1.5
 	 */
 	public $_cache;
@@ -42,7 +35,7 @@ class PlgSystemCache extends CMSPlugin
 	/**
 	 * Application object.
 	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * @var    JApplicationCms
 	 * @since  3.8.0
 	 */
 	protected $app;
@@ -55,14 +48,14 @@ class PlgSystemCache extends CMSPlugin
 	 *
 	 * @since   1.5
 	 */
-	public function __construct(&$subject, $config)
+	public function __construct(& $subject, $config)
 	{
 		parent::__construct($subject, $config);
 
-		// Run only when we're on Site Application side
-		if (!$this->app->isClient('site'))
+		// Get the application if not done by JPlugin.
+		if (!isset($this->app))
 		{
-			return;
+			$this->app = JFactory::getApplication();
 		}
 
 		// Set the cache options.
@@ -73,8 +66,8 @@ class PlgSystemCache extends CMSPlugin
 		);
 
 		// Instantiate cache with previous options and create the cache key identifier.
-		$this->_cache     = Cache::getInstance('page', $options);
-		$this->_cache_key = Uri::getInstance()->toString();
+		$this->_cache     = JCache::getInstance('page', $options);
+		$this->_cache_key = JUri::getInstance()->toString();
 	}
 
 	/**
@@ -88,18 +81,12 @@ class PlgSystemCache extends CMSPlugin
 	{
 		static $key;
 
-		// Run only when we're on Site Application side
-		if (!$this->app->isClient('site'))
-		{
-			return '';
-		}
-
 		if (!$key)
 		{
-			PluginHelper::importPlugin('pagecache');
+			JPluginHelper::importPlugin('pagecache');
 
-			$parts = $this->app->triggerEvent('onPageCacheGetKey');
-			$parts[] = Uri::getInstance()->toString();
+			$parts = JEventDispatcher::getInstance()->trigger('onPageCacheGetKey');
+			$parts[] = JUri::getInstance()->toString();
 
 			$key = md5(serialize($parts));
 		}
@@ -108,26 +95,27 @@ class PlgSystemCache extends CMSPlugin
 	}
 
 	/**
+	 * After Initialise Event.
 	 * Checks if URL exists in cache, if so dumps it directly and closes.
 	 *
 	 * @return  void
 	 *
-	 * @since   4.0.0
+	 * @since   1.5
 	 */
-	public function onAfterRoute()
+	public function onAfterInitialise()
 	{
-		if (!$this->app->isClient('site') || $this->app->get('offline', '0') || $this->app->getMessageQueue())
+		if ($this->app->isClient('administrator') || $this->app->get('offline', '0') || $this->app->getMessageQueue())
 		{
 			return;
 		}
 
 		// If any pagecache plugins return false for onPageCacheSetCaching, do not use the cache.
-		PluginHelper::importPlugin('pagecache');
+		JPluginHelper::importPlugin('pagecache');
 
-		$results = $this->app->triggerEvent('onPageCacheSetCaching');
+		$results = JEventDispatcher::getInstance()->trigger('onPageCacheSetCaching');
 		$caching = !in_array(false, $results, true);
 
-		if ($caching && $this->app->getIdentity()->guest && $this->app->input->getMethod() === 'GET')
+		if ($caching && JFactory::getUser()->guest && $this->app->input->getMethod() === 'GET')
 		{
 			$this->_cache->setCaching(true);
 		}
@@ -143,15 +131,12 @@ class PlgSystemCache extends CMSPlugin
 			// Dumps HTML page.
 			echo $this->app->toString((bool) $this->app->get('gzip'));
 
-			// Mark afterCache in debug and run debug onAfterRespond events, e.g. show Joomla Debug Console if debug is active.
+			// Mark afterCache in debug and run debug onAfterRespond events.
+			// e.g., show Joomla Debug Console if debug is active.
 			if (JDEBUG)
 			{
-				// Create a document instance and load it into the application.
-				$document = Factory::getContainer()->get('document.factory')->createDocument($this->app->input->get('format', 'html'));
-				$this->app->loadDocument($document);
-
-				Profiler::getInstance('Application')->mark('afterCache');
-				$this->app->triggerEvent('onAfterRespond');
+				JProfiler::getInstance('Application')->mark('afterCache');
+				JEventDispatcher::getInstance()->trigger('onAfterRespond');
 			}
 
 			// Closes the application.
@@ -169,12 +154,6 @@ class PlgSystemCache extends CMSPlugin
 	 */
 	public function onAfterRender()
 	{
-		// Run only when we're on Site Application side
-		if (!$this->app->isClient('site'))
-		{
-			return;
-		}
-
 		if ($this->_cache->getCaching() === false)
 		{
 			return;
@@ -182,7 +161,7 @@ class PlgSystemCache extends CMSPlugin
 
 		// We need to check if user is guest again here, because auto-login plugins have not been fired before the first aid check.
 		// Page is excluded if excluded in plugin settings.
-		if (!$this->app->getIdentity()->guest || $this->app->getMessageQueue() || $this->isExcluded() === true)
+		if (!JFactory::getUser()->guest || $this->app->getMessageQueue() || $this->isExcluded() === true)
 		{
 			$this->_cache->setCaching(false);
 
@@ -203,12 +182,6 @@ class PlgSystemCache extends CMSPlugin
 	 */
 	public function onAfterRespond()
 	{
-		// Run only when we're on Site Application side
-		if (!$this->app->isClient('site'))
-		{
-			return;
-		}
-
 		if ($this->_cache->getCaching() === false)
 		{
 			return;
@@ -249,7 +222,7 @@ class PlgSystemCache extends CMSPlugin
 			$exclusions = explode("\n", $exclusions);
 
 			// Gets internal URI.
-			$internal_uri	= '/index.php?' . Uri::getInstance()->buildQuery($this->app->getRouter()->getVars());
+			$internal_uri	= '/index.php?' . JUri::getInstance()->buildQuery($this->app->getRouter()->getVars());
 
 			// Loop through each pattern.
 			if ($exclusions)
@@ -260,7 +233,7 @@ class PlgSystemCache extends CMSPlugin
 					if ($exclusion !== '')
 					{
 						// Test both external and internal URI
-						if (preg_match('#' . $exclusion . '#i', $this->_cache_key . ' ' . $internal_uri))
+						if (preg_match('#' . $exclusion . '#i', $this->_cache_key . ' ' . $internal_uri, $match))
 						{
 							return true;
 						}
@@ -270,9 +243,9 @@ class PlgSystemCache extends CMSPlugin
 		}
 
 		// If any pagecache plugins return true for onPageCacheIsExcluded, exclude.
-		PluginHelper::importPlugin('pagecache');
+		JPluginHelper::importPlugin('pagecache');
 
-		$results = $this->app->triggerEvent('onPageCacheIsExcluded');
+		$results = JEventDispatcher::getInstance()->trigger('onPageCacheIsExcluded');
 
 		return in_array(true, $results, true);
 	}

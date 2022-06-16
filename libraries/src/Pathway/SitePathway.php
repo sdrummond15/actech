@@ -8,10 +8,9 @@
 
 namespace Joomla\CMS\Pathway;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Application\SiteApplication;
-use Joomla\CMS\Factory;
+use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Language\Multilanguage;
 
 /**
@@ -24,17 +23,17 @@ class SitePathway extends Pathway
 	/**
 	 * Class constructor.
 	 *
-	 * @param   SiteApplication  $app  Application Object
+	 * @param   array  $options  The class options.
 	 *
 	 * @since   1.5
 	 */
-	public function __construct(SiteApplication $app = null)
+	public function __construct($options = array())
 	{
-		$this->pathway = array();
+		$this->_pathway = array();
 
-		$app  = $app ?: Factory::getContainer()->get(SiteApplication::class);
+		$app  = CMSApplication::getInstance('site');
 		$menu = $app->getMenu();
-		$lang = Factory::getLanguage();
+		$lang = \JFactory::getLanguage();
 
 		if ($item = $menu->getActive())
 		{
@@ -50,7 +49,7 @@ class SitePathway extends Pathway
 				$home  = $menu->getDefault();
 			}
 
-			if (\is_object($home) && ($item->id != $home->id))
+			if (is_object($home) && ($item->id != $home->id))
 			{
 				foreach ($item->tree as $menupath)
 				{
@@ -77,7 +76,7 @@ class SitePathway extends Pathway
 
 						case 'alias':
 							// If this is an alias use the item id stored in the parameters to make the link.
-							$url = 'index.php?Itemid=' . $link->getParams()->get('aliasoptions');
+							$url = 'index.php?Itemid=' . $link->params->get('aliasoptions');
 							break;
 
 						default:

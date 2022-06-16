@@ -8,14 +8,18 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
+
+use Joomla\CMS\Form\FormHelper;
+
+FormHelper::loadFieldClass('predefinedlist');
 
 /**
  * Redirect Status field.
  *
  * @since  3.8.0
  */
-class RedirectStatusField extends PredefinedlistField
+class RedirectStatusField extends \JFormFieldPredefinedList
 {
 	/**
 	 * The form field type.

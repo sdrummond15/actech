@@ -9,9 +9,7 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-
-$app  = Factory::getApplication();
+$app = JFactory::getApplication();
 $form = $displayData->getForm();
 
 $name = $displayData->get('fieldset');
@@ -23,7 +21,7 @@ if (empty($fieldSet))
 }
 
 $ignoreFields = $displayData->get('ignore_fields') ? : array();
-$extraFields  = $displayData->get('extra_fields') ? : array();
+$extraFields = $displayData->get('extra_fields') ? : array();
 
 if (!empty($displayData->showOptions) || $displayData->get('show_options', 1))
 {
@@ -54,7 +52,7 @@ if (!empty($displayData->showOptions) || $displayData->get('show_options', 1))
 else
 {
 	$html = array();
-	$html[] = '<div class="hidden">';
+	$html[] = '<div style="display:none;">';
 	foreach ($fieldSet as $field)
 	{
 		$html[] = $field->input;

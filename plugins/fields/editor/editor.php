@@ -9,27 +9,27 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Form\Form;
+JLoader::import('components.com_fields.libraries.fieldsplugin', JPATH_ADMINISTRATOR);
 
 /**
  * Fields Editor Plugin
  *
  * @since  3.7.0
  */
-class PlgFieldsEditor extends \Joomla\Component\Fields\Administrator\Plugin\FieldsPlugin
+class PlgFieldsEditor extends FieldsPlugin
 {
 	/**
 	 * Transforms the field into a DOM XML element and appends it as a child on the given parent.
 	 *
 	 * @param   stdClass    $field   The field.
 	 * @param   DOMElement  $parent  The field node parent.
-	 * @param   Form        $form    The form.
+	 * @param   JForm       $form    The form.
 	 *
 	 * @return  DOMElement
 	 *
 	 * @since   3.7.0
 	 */
-	public function onCustomFieldsPrepareDom($field, DOMElement $parent, Form $form)
+	public function onCustomFieldsPrepareDom($field, DOMElement $parent, JForm $form)
 	{
 		$fieldNode = parent::onCustomFieldsPrepareDom($field, $parent, $form);
 

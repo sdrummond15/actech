@@ -9,20 +9,19 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
 use Joomla\CMS\Form\Form;
-use Joomla\CMS\Language\Multilanguage;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\Component\Fields\Administrator\Helper\FieldsHelper;
-use Joomla\Component\Finder\Administrator\Indexer\Indexer;
 use Joomla\Registry\Registry;
+use Joomla\CMS\Factory;
+use Joomla\CMS\Language\Multilanguage;
+
+JLoader::register('FieldsHelper', JPATH_ADMINISTRATOR . '/components/com_fields/helpers/fields.php');
 
 /**
  * Fields Plugin
  *
  * @since  3.7
  */
-class PlgSystemFields extends CMSPlugin
+class PlgSystemFields extends JPlugin
 {
 	/**
 	 * Load the language file on instantiation.
@@ -47,7 +46,7 @@ class PlgSystemFields extends CMSPlugin
 	{
 		if (!FieldsHelper::extract($context, $data))
 		{
-			return;
+			return true;
 		}
 
 		// Loop over all fields
@@ -84,25 +83,25 @@ class PlgSystemFields extends CMSPlugin
 	/**
 	 * The save event.
 	 *
-	 * @param   string                   $context  The context
-	 * @param   \Joomla\CMS\Table\Table  $item     The table
-	 * @param   boolean                  $isNew    Is new item
-	 * @param   array                    $data     The validated data
+	 * @param   string   $context  The context
+	 * @param   JTable   $item     The table
+	 * @param   boolean  $isNew    Is new item
+	 * @param   array    $data     The validated data
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.7.0
 	 */
-	public function onContentAfterSave($context, $item, $isNew, $data = []): void
+	public function onContentAfterSave($context, $item, $isNew, $data = array())
 	{
 		// Check if data is an array and the item has an id
 		if (!is_array($data) || empty($item->id) || empty($data['com_fields']))
 		{
-			return;
+			return true;
 		}
 
 		// Create correct context for category
-		if ($context === 'com_categories.category')
+		if ($context == 'com_categories.category')
 		{
 			$context = $item->extension . '.categories';
 
@@ -115,7 +114,7 @@ class PlgSystemFields extends CMSPlugin
 
 		if (!$parts)
 		{
-			return;
+			return true;
 		}
 
 		// Compile the right context for the fields
@@ -126,20 +125,17 @@ class PlgSystemFields extends CMSPlugin
 
 		if (!$fields)
 		{
-			return;
+			return true;
 		}
 
 		// Loading the model
-
-		/** @var \Joomla\Component\Fields\Administrator\Model\FieldModel $model */
-		$model = Factory::getApplication()->bootComponent('com_fields')->getMVCFactory()
-			->createModel('Field', 'Administrator', ['ignore_request' => true]);
+		$model = JModelLegacy::getInstance('Field', 'FieldsModel', array('ignore_request' => true));
 
 		// Loop over the fields
 		foreach ($fields as $field)
 		{
 			// Determine the value if it is (un)available from the data
-			if (array_key_exists($field->name, $data['com_fields']))
+			if (key_exists($field->name, $data['com_fields']))
 			{
 				$value = $data['com_fields'][$field->name] === false ? null : $data['com_fields'][$field->name];
 			}
@@ -164,6 +160,8 @@ class PlgSystemFields extends CMSPlugin
 			// Setting the value for the field and the item
 			$model->setFieldValue($field->id, $item->id, $value);
 		}
+
+		return true;
 	}
 
 	/**
@@ -174,31 +172,33 @@ class PlgSystemFields extends CMSPlugin
 	 * @param   boolean  $success   Is success
 	 * @param   string   $msg       The message
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.7.0
 	 */
-	public function onUserAfterSave($userData, $isNew, $success, $msg): void
+	public function onUserAfterSave($userData, $isNew, $success, $msg)
 	{
 		// It is not possible to manipulate the user during save events
 		// Check if data is valid or we are in a recursion
 		if (!$userData['id'] || !$success)
 		{
-			return;
+			return true;
 		}
 
-		$user = Factory::getUser($userData['id']);
+		$user = JFactory::getUser($userData['id']);
 
-		$task = Factory::getApplication()->input->getCmd('task');
+		$task = JFactory::getApplication()->input->getCmd('task');
 
 		// Skip fields save when we activate a user, because we will lose the saved data
 		if (in_array($task, array('activate', 'block', 'unblock')))
 		{
-			return;
+			return true;
 		}
 
 		// Trigger the events with a real user
 		$this->onContentAfterSave('com_users.user', $user, false, $userData);
+
+		return true;
 	}
 
 	/**
@@ -207,57 +207,59 @@ class PlgSystemFields extends CMSPlugin
 	 * @param   string    $context  The context
 	 * @param   stdClass  $item     The item
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.7.0
 	 */
-	public function onContentAfterDelete($context, $item): void
+	public function onContentAfterDelete($context, $item)
 	{
 		$parts = FieldsHelper::extract($context, $item);
 
 		if (!$parts || empty($item->id))
 		{
-			return;
+			return true;
 		}
 
 		$context = $parts[0] . '.' . $parts[1];
 
-		/** @var \Joomla\Component\Fields\Administrator\Model\FieldModel $model */
-		$model = Factory::getApplication()->bootComponent('com_fields')->getMVCFactory()
-			->createModel('Field', 'Administrator', ['ignore_request' => true]);
+		JModelLegacy::addIncludePath(JPATH_ADMINISTRATOR . '/components/com_fields/models', 'FieldsModel');
+
+		$model = JModelLegacy::getInstance('Field', 'FieldsModel', array('ignore_request' => true));
 		$model->cleanupValues($context, $item->id);
+
+		return true;
 	}
 
 	/**
 	 * The user delete event.
 	 *
 	 * @param   stdClass  $user    The context
-	 * @param   boolean   $success Is success
+	 * @param   boolean   $succes  Is success
 	 * @param   string    $msg     The message
 	 *
-	 * @return  void
+	 * @return  boolean
 	 *
 	 * @since   3.7.0
 	 */
-	public function onUserAfterDelete($user, $success, $msg): void
+	public function onUserAfterDelete($user, $succes, $msg)
 	{
 		$item     = new stdClass;
 		$item->id = $user['id'];
 
-		$this->onContentAfterDelete('com_users.user', $item);
+		return $this->onContentAfterDelete('com_users.user', $item);
 	}
 
 	/**
 	 * The form event.
 	 *
-	 * @param   Form      $form  The form
+	 * @param   JForm     $form  The form
 	 * @param   stdClass  $data  The data
 	 *
 	 * @return  boolean
 	 *
 	 * @since   3.7.0
 	 */
-	public function onContentPrepareForm(Form $form, $data)
+	public function onContentPrepareForm(JForm $form, $data)
 	{
 		$context = $form->getName();
 
@@ -265,10 +267,9 @@ class PlgSystemFields extends CMSPlugin
 		if (strpos($context, 'com_categories.category') === 0)
 		{
 			$context = str_replace('com_categories.category', '', $context) . '.categories';
-			$data    = $data ?: Factory::getApplication()->input->get('jform', [], 'array');
 
 			// Set the catid on the category to get only the fields which belong to this category
-			if (is_array($data) && array_key_exists('id', $data))
+			if (is_array($data) && key_exists('id', $data))
 			{
 				$data['catid'] = $data['id'];
 			}
@@ -286,7 +287,7 @@ class PlgSystemFields extends CMSPlugin
 			return true;
 		}
 
-		$input = Factory::getApplication()->input;
+		$input = JFactory::getApplication()->input;
 
 		// If we are on the save command we need the actual data
 		$jformData = $input->get('jform', array(), 'array');
@@ -379,7 +380,7 @@ class PlgSystemFields extends CMSPlugin
 		}
 
 		// If we have a category, set the catid field to fetch only the fields which belong to it
-		if ($parts[1] === 'categories' && !isset($item->catid))
+		if ($parts[1] == 'categories' && !isset($item->catid))
 		{
 			$item->catid = $item->id;
 		}
@@ -406,13 +407,13 @@ class PlgSystemFields extends CMSPlugin
 		{
 			$app = Factory::getApplication();
 
-			if ($app->isClient('site') && Multilanguage::isEnabled() && isset($item->language) && $item->language === '*')
+			if ($app->isClient('site') && Multilanguage::isEnabled() && isset($item->language) && $item->language == '*')
 			{
 				$lang = $app->getLanguage()->getTag();
 
 				foreach ($fields as $key => $field)
 				{
-					if ($field->language === '*' || $field->language == $lang)
+					if ($field->language == '*' || $field->language == $lang)
 					{
 						continue;
 					}
@@ -445,7 +446,7 @@ class PlgSystemFields extends CMSPlugin
 				array(
 					'item'            => $item,
 					'context'         => $context,
-					'fields'          => $fields,
+					'fields'          => $fields
 				)
 			);
 		}
@@ -503,7 +504,9 @@ class PlgSystemFields extends CMSPlugin
 	}
 
 	/**
-	 * @param   \Joomla\Component\Finder\Administrator\Indexer\Result  $item  The item
+	 * The finder event.
+	 *
+	 * @param   stdClass  $item  The item
 	 *
 	 * @return  boolean
 	 *
@@ -549,7 +552,7 @@ class PlgSystemFields extends CMSPlugin
 					foreach ($fields as $field)
 					{
 						// Adding the instructions how to handle the text
-						$item->addInstruction(Indexer::TEXT_CONTEXT, $field->name);
+						$item->addInstruction(FinderIndexer::TEXT_CONTEXT, $field->name);
 
 						// Adding the field value as a field
 						$item->{$field->name} = $field->value;

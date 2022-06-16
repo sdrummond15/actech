@@ -8,12 +8,9 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Access\Rules;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\Database\DatabaseDriver;
 use Joomla\Registry\Registry;
 
 /**
@@ -24,25 +21,17 @@ use Joomla\Registry\Registry;
 class Module extends Table
 {
 	/**
-	 * Indicates that columns fully support the NULL value in the database
-	 *
-	 * @var    boolean
-	 * @since  4.0.0
-	 */
-	protected $_supportNullValue = true;
-
-	/**
 	 * Constructor.
 	 *
-	 * @param   DatabaseDriver  $db  Database driver object.
+	 * @param   \JDatabaseDriver  $db  Database driver object.
 	 *
 	 * @since   1.5
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct(\JDatabaseDriver $db)
 	{
 		parent::__construct('#__modules', 'id', $db);
 
-		$this->access = (int) Factory::getApplication()->get('access');
+		$this->access = (int) \JFactory::getConfig()->get('access');
 	}
 
 	/**
@@ -126,40 +115,18 @@ class Module extends Table
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		// Check for valid name
 		if (trim($this->title) === '')
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_MUSTCONTAIN_A_TITLE_MODULE'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_MUSTCONTAIN_A_TITLE_MODULE'));
 
 			return false;
 		}
 
-		// Set publish_up, publish_down to null if not set
-		if (!$this->publish_up)
+		// Prevent to save too large content > 65535 
+		if ((strlen($this->content) > 65535) || (strlen($this->params) > 65535))
 		{
-			$this->publish_up = null;
-		}
-
-		if (!$this->publish_down)
-		{
-			$this->publish_down = null;
-		}
-
-		// Prevent to save too large content > 65535
-		if ((\strlen($this->content) > 65535) || (\strlen($this->params) > 65535))
-		{
-			$this->setError(Text::_('COM_MODULES_FIELD_CONTENT_TOO_LARGE'));
+			$this->setError(\JText::_('COM_MODULES_FIELD_CONTENT_TOO_LARGE'));
 
 			return false;
 		}
@@ -189,14 +156,14 @@ class Module extends Table
 	 */
 	public function bind($array, $ignore = '')
 	{
-		if (isset($array['params']) && \is_array($array['params']))
+		if (isset($array['params']) && is_array($array['params']))
 		{
 			$registry = new Registry($array['params']);
 			$array['params'] = (string) $registry;
 		}
 
 		// Bind the rules.
-		if (isset($array['rules']) && \is_array($array['rules']))
+		if (isset($array['rules']) && is_array($array['rules']))
 		{
 			$rules = new Rules($array['rules']);
 			$this->setRules($rules);
@@ -214,11 +181,17 @@ class Module extends Table
 	 *
 	 * @since   3.7.0
 	 */
-	public function store($updateNulls = true)
+	public function store($updateNulls = false)
 	{
-		if (!$this->ordering)
+		// Set publish_up, publish_down and checked_out_time to null date if not set
+		if (!$this->publish_up)
 		{
-			$this->ordering = $this->getNextOrder($this->_db->quoteName('position') . ' = ' . $this->_db->quote($this->position));
+			$this->publish_up = $this->_db->getNullDate();
+		}
+
+		if (!$this->publish_down)
+		{
+			$this->publish_down = $this->_db->getNullDate();
 		}
 
 		return parent::store($updateNulls);

@@ -9,16 +9,12 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Object\CMSObject;
-use Joomla\CMS\Plugin\CMSPlugin;
-
 /**
  * Editor Readmore button
  *
  * @since  1.5
  */
-class PlgButtonReadmore extends CMSPlugin
+class PlgButtonReadmore extends JPlugin
 {
 	/**
 	 * Load the language file on instantiation.
@@ -29,43 +25,33 @@ class PlgButtonReadmore extends CMSPlugin
 	protected $autoloadLanguage = true;
 
 	/**
-	 * Application object.
-	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
-	 * @since  4.0.0
-	 */
-	protected $app;
-
-	/**
 	 * Readmore button
 	 *
 	 * @param   string  $name  The name of the button to add
 	 *
-	 * @return  CMSObject  $button  A two element array of (imageName, textToInsert)
+	 * @return  JObject  The button options as JObject
 	 *
 	 * @since   1.5
 	 */
 	public function onDisplay($name)
 	{
-		$doc = $this->app->getDocument();
-		$doc->getWebAssetManager()
-			->registerAndUseScript('com_content.admin-article-readmore', 'com_content/admin-article-readmore.min.js', [], ['defer' => true], ['core']);
+		JHtml::_('script', 'com_content/admin-article-readmore.min.js', array('version' => 'auto', 'relative' => true));
 
 		// Pass some data to javascript
-		$doc->addScriptOptions(
+		JFactory::getDocument()->addScriptOptions(
 			'xtd-readmore',
 			array(
-				'exists' => Text::_('PLG_READMORE_ALREADY_EXISTS', true),
+				'editor' => $this->_subject->getContent($name),
+				'exists' => JText::_('PLG_READMORE_ALREADY_EXISTS', true),
 			)
 		);
 
-		$button = new CMSObject;
+		$button = new JObject;
 		$button->modal   = false;
+		$button->class   = 'btn';
 		$button->onclick = 'insertReadmore(\'' . $name . '\');return false;';
-		$button->text    = Text::_('PLG_READMORE_BUTTON_READMORE');
-		$button->name    = $this->_type . '_' . $this->_name;
-		$button->icon    = 'arrow-down';
-		$button->iconSVG = '<svg viewBox="0 0 32 32" width="24" height="24"><path d="M32 12l-6-6-10 10-10-10-6 6 16 16z"></path></svg>';
+		$button->text    = JText::_('PLG_READMORE_BUTTON_READMORE');
+		$button->name    = 'arrow-down';
 		$button->link    = '#';
 
 		return $button;

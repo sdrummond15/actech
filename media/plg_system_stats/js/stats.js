@@ -1,48 +1,93 @@
 /**
- * @copyright  (C) 2018 Open Source Matters, Inc. <https://www.joomla.org>
- * @license    GNU General Public License version 2 or later; see LICENSE.txt
- * @since      3.5.0
+ * @copyright   (C) 2015 Open Source Matters, Inc. <https://www.joomla.org>
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(document => {
 
-  const statsDataTogglerId = 'js-pstats-data-details-toggler';
-  const statsDataDetailsId = 'js-pstats-data-details';
-  const resetId = 'js-pstats-reset-uid';
-  const uniqueIdFieldId = 'jform_params_unique_id';
+/**
+ * stats javascript behavior
+ *
+ * To allow users to accept & configure stats sending
+ *
+ * @package     Joomla
+ * @since       3.5.0
+ * @version  1.0
+ */
 
-  const onToggle = event => {
-    event.preventDefault();
-    const element = document.getElementById(statsDataDetailsId);
+(function ($) {
+	$(document).ready(function () {
+		var ajaxData = {
+			'option' : 'com_ajax',
+			'group'  : 'system',
+			'plugin' : 'renderStatsMessage',
+			'format' : 'raw'
+			},
+			messageContainer = $('#system-message-container');
 
-    if (element) {
-      element.classList.toggle('d-none');
-    }
-  };
+		/**
+		 * Initialise events for the message container
+		 *
+		 * @return  void
+		 */
+		function initStatsEvents()
+		{
+			var globalContainer = messageContainer.find('.js-pstats-alert'),
+				detailsContainer = messageContainer.find('.js-pstats-data-details');
 
-  const onReset = event => {
-    event.preventDefault();
-    document.getElementById(uniqueIdFieldId).value = '';
-    Joomla.submitbutton('plugin.apply');
-  };
+			// Show details about the information being sent
+			messageContainer.on('click', '.js-pstats-btn-details', function(e){
+				detailsContainer.toggle(200);
+				e.preventDefault();
+			});
 
-  const onBoot = () => {
-    // Toggle stats details
-    const toggler = document.getElementById(statsDataTogglerId);
+			// Always allow
+			messageContainer.on('click', '.js-pstats-btn-allow-always', function(e){
 
-    if (toggler) {
-      toggler.addEventListener('click', onToggle);
-    } // Reset the unique id
+				// Remove message
+				globalContainer.hide(200);
+				detailsContainer.remove();
+				ajaxData.plugin = 'sendAlways';
 
+				$.getJSON('index.php', ajaxData, function(response){});
+				e.preventDefault();
+			});
 
-    const reset = document.getElementById(resetId);
+			// Allow once
+			messageContainer.on('click', '.js-pstats-btn-allow-once', function(e){
 
-    if (reset) {
-      reset.addEventListener('click', onReset);
-    } // Cleanup
+				// Remove message
+				globalContainer.hide(200);
+				detailsContainer.remove();
 
+				ajaxData.plugin = 'sendOnce';
 
-    document.removeEventListener('DOMContentLoaded', onBoot);
-  };
+				$.getJSON('index.php', ajaxData, function(response){});
+				e.preventDefault();
+			});
 
-  document.addEventListener('DOMContentLoaded', onBoot);
-})(document, Joomla);
+			// Never allow
+			messageContainer.on('click', '.js-pstats-btn-allow-never', function(e){
+
+				// Remove message
+				globalContainer.hide(200);
+				detailsContainer.remove();
+
+				ajaxData.plugin = 'sendNever';
+
+				$.getJSON('index.php', ajaxData, function(response){});
+				e.preventDefault();
+			});
+		}
+
+		ajaxData.plugin = 'sendStats';
+
+		$.getJSON('index.php', ajaxData, function(response){
+			if (response && response.html) {
+				messageContainer
+					.append(response.html)
+					.find('.js-pstats-alert').show(200);
+
+				initStatsEvents();
+			}
+		});
+	});
+})(jQuery);

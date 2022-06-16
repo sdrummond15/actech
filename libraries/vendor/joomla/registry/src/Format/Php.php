@@ -2,20 +2,20 @@
 /**
  * Part of the Joomla Framework Registry Package
  *
- * @copyright  Copyright (C) 2005 - 2021 Open Source Matters, Inc. All rights reserved.
+ * @copyright  Copyright (C) 2005 - 2022 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
 
 namespace Joomla\Registry\Format;
 
-use Joomla\Registry\FormatInterface;
+use Joomla\Registry\AbstractRegistryFormat;
 
 /**
  * PHP class format handler for Registry
  *
  * @since  1.0
  */
-class Php implements FormatInterface
+class Php extends AbstractRegistryFormat
 {
 	/**
 	 * Converts an object into a php class string.
@@ -28,17 +28,24 @@ class Php implements FormatInterface
 	 *
 	 * @since   1.0
 	 */
-	public function objectToString($object, array $params = [])
+	public function objectToString($object, $params = array())
 	{
 		// A class must be provided
-		$class = $params['class'] ?? 'Registry';
+		$class = !empty($params['class']) ? $params['class'] : 'Registry';
 
 		// Build the object variables string
 		$vars = '';
 
 		foreach (get_object_vars($object) as $k => $v)
 		{
-			$vars .= "\tpublic \$$k = " . $this->formatValue($v) . ";\n";
+			if (is_scalar($v))
+			{
+				$vars .= "\tpublic $" . $k . " = '" . addcslashes($v, '\\\'') . "';\n";
+			}
+			elseif (\is_array($v) || \is_object($v))
+			{
+				$vars .= "\tpublic $" . $k . ' = ' . $this->getArrayString((array) $v) . ";\n";
+			}
 		}
 
 		$str = "<?php\n";
@@ -49,7 +56,7 @@ class Php implements FormatInterface
 			$str .= 'namespace ' . $params['namespace'] . ";\n\n";
 		}
 
-		$str .= "class $class {\n";
+		$str .= 'class ' . $class . " {\n";
 		$str .= $vars;
 		$str .= '}';
 
@@ -72,41 +79,9 @@ class Php implements FormatInterface
 	 *
 	 * @since   1.0
 	 */
-	public function stringToObject($data, array $options = [])
+	public function stringToObject($data, array $options = array())
 	{
 		return new \stdClass;
-	}
-
-	/**
-	 * Format a value for the string conversion
-	 *
-	 * @param   mixed  $value  The value to format
-	 *
-	 * @return  mixed  The formatted value
-	 *
-	 * @since   2.0.0
-	 */
-	protected function formatValue($value)
-	{
-		switch (\gettype($value))
-		{
-			case 'string':
-				return "'" . addcslashes($value, '\\\'') . "'";
-
-			case 'array':
-			case 'object':
-				return $this->getArrayString((array) $value);
-
-			case 'double':
-			case 'integer':
-				return $value;
-
-			case 'boolean':
-				return $value ? 'true' : 'false';
-
-			case 'NULL':
-				return 'null';
-		}
 	}
 
 	/**
@@ -126,8 +101,16 @@ class Php implements FormatInterface
 		foreach ($a as $k => $v)
 		{
 			$s .= $i ? ', ' : '';
-			$s .= "'" . addcslashes($k, '\\\'') . "' => ";
-			$s .= $this->formatValue($v);
+			$s .= '"' . $k . '" => ';
+
+			if (\is_array($v) || \is_object($v))
+			{
+				$s .= $this->getArrayString((array) $v);
+			}
+			else
+			{
+				$s .= '"' . addslashes($v) . '"';
+			}
 
 			$i++;
 		}

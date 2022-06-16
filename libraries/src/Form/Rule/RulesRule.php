@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Form\Rule;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Access\Access;
 use Joomla\CMS\Form\Form;
@@ -46,7 +46,7 @@ class RulesRule extends FormRule
 		// Make sure that all posted actions are in the list of possible actions for the field.
 		foreach ($valueActions as $action)
 		{
-			if (!\in_array($action, $fieldActions))
+			if (!in_array($action, $fieldActions))
 			{
 				return false;
 			}
@@ -95,24 +95,18 @@ class RulesRule extends FormRule
 		$component = $element['component'] ? (string) $element['component'] : '';
 
 		// Get the asset actions for the element.
-		$elActions = Access::getActionsFromFile(
-			JPATH_ADMINISTRATOR . '/components/' . $component . '/access.xml',
-			"/access/section[@name='" . $section . "']/"
-		);
+		$elActions = Access::getActions($component, $section);
 
-		if ($elActions)
+		// Iterate over the asset actions and add to the actions.
+		foreach ($elActions as $item)
 		{
-			// Iterate over the asset actions and add to the actions.
-			foreach ($elActions as $item)
-			{
-				$actions[] = $item->name;
-			}
+			$actions[] = $item->name;
 		}
 
 		// Iterate over the children and add to the actions.
 		foreach ($element->children() as $el)
 		{
-			if ($el->getName() === 'action')
+			if ($el->getName() == 'action')
 			{
 				$actions[] = (string) $el['name'];
 			}

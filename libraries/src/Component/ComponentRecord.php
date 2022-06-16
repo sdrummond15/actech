@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Component;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\Registry\Registry;
 
@@ -16,8 +16,9 @@ use Joomla\Registry\Registry;
  * Object representing a component extension record
  *
  * @since  3.7.0
+ * @note   As of 4.0 this class will no longer extend JObject
  */
-class ComponentRecord
+class ComponentRecord extends \JObject
 {
 	/**
 	 * Primary key
@@ -43,14 +44,6 @@ class ComponentRecord
 	 * @note   This field is protected to require reading this field to proxy through the getter to convert the params to a Registry instance
 	 */
 	protected $params;
-
-	/**
-	 * The extension namespace
-	 *
-	 * @var    string
-	 * @since  4.0.0
-	 */
-	public $namespace;
 
 	/**
 	 * Indicates if this component is enabled
@@ -83,7 +76,7 @@ class ComponentRecord
 	 * @return  mixed  The property value or null.
 	 *
 	 * @since   3.7.0
-	 * @deprecated  5.0  Access the item parameters through the `getParams()` method
+	 * @deprecated  4.0  Access the item parameters through the `getParams()` method
 	 */
 	public function __get($name)
 	{
@@ -92,7 +85,7 @@ class ComponentRecord
 			return $this->getParams();
 		}
 
-		return $this->$name;
+		return $this->get($name);
 	}
 
 	/**
@@ -104,7 +97,7 @@ class ComponentRecord
 	 * @return  void
 	 *
 	 * @since   3.7.0
-	 * @deprecated  5.0  Set the item parameters through the `setParams()` method
+	 * @deprecated  4.0  Set the item parameters through the `setParams()` method
 	 */
 	public function __set($name, $value)
 	{
@@ -115,7 +108,7 @@ class ComponentRecord
 			return;
 		}
 
-		$this->$name = $value;
+		$this->set($name, $value);
 	}
 
 	/**

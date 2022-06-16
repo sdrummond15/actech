@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Form\Field;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Form\FormField;
 use Joomla\CMS\Session\Session;
@@ -47,9 +47,10 @@ class ModuleorderField extends FormField
 	 */
 	public function __get($name)
 	{
-		if ($name === 'linked')
+		switch ($name)
 		{
-			return $this->linked;
+			case 'linked':
+				return $this->$name;
 		}
 
 		return parent::__get($name);
@@ -79,7 +80,7 @@ class ModuleorderField extends FormField
 	}
 
 	/**
-	 * Method to attach a Form object to the field.
+	 * Method to attach a JForm object to the field.
 	 *
 	 * @param   \SimpleXMLElement  $element  The SimpleXMLElement object representing the `<field>` tag for the form field object.
 	 * @param   mixed              $value    The form field value to validate.

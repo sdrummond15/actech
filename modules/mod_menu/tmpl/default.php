@@ -9,13 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Helper\ModuleHelper;
-
-/** @var Joomla\CMS\WebAsset\WebAssetManager $wa */
-$wa = $app->getDocument()->getWebAssetManager();
-$wa->registerAndUseScript('mod_menu', 'mod_menu/menu.min.js', [], ['type' => 'module']);
-$wa->registerAndUseScript('mod_menu', 'mod_menu/menu-es5.min.js', [], ['nomodule' => true, 'defer' => true]);
-
 $id = '';
 
 if ($tagId = $params->get('tag_id', ''))
@@ -23,20 +16,19 @@ if ($tagId = $params->get('tag_id', ''))
 	$id = ' id="' . $tagId . '"';
 }
 
-// The menu class is deprecated. Use mod-menu instead
+// The menu class is deprecated. Use nav instead
 ?>
-<ul<?php echo $id; ?> class="mod-menu mod-list nav <?php echo $class_sfx; ?>">
+<ul class="nav menu<?php echo $class_sfx; ?> mod-list"<?php echo $id; ?>>
 <?php foreach ($list as $i => &$item)
 {
-	$itemParams = $item->getParams();
-	$class      = 'nav-item item-' . $item->id;
+	$class = 'item-' . $item->id;
 
 	if ($item->id == $default_id)
 	{
 		$class .= ' default';
 	}
 
-	if ($item->id == $active_id || ($item->type === 'alias' && $itemParams->get('aliasoptions') == $active_id))
+	if ($item->id == $active_id || ($item->type === 'alias' && $item->params->get('aliasoptions') == $active_id))
 	{
 		$class .= ' current';
 	}
@@ -47,7 +39,7 @@ if ($tagId = $params->get('tag_id', ''))
 	}
 	elseif ($item->type === 'alias')
 	{
-		$aliasToId = $itemParams->get('aliasoptions');
+		$aliasToId = $item->params->get('aliasoptions');
 
 		if (count($path) > 0 && $aliasToId == $path[count($path) - 1])
 		{
@@ -81,18 +73,18 @@ if ($tagId = $params->get('tag_id', ''))
 		case 'component':
 		case 'heading':
 		case 'url':
-			require ModuleHelper::getLayoutPath('mod_menu', 'default_' . $item->type);
+			require JModuleHelper::getLayoutPath('mod_menu', 'default_' . $item->type);
 			break;
 
 		default:
-			require ModuleHelper::getLayoutPath('mod_menu', 'default_url');
+			require JModuleHelper::getLayoutPath('mod_menu', 'default_url');
 			break;
 	endswitch;
 
 	// The next item is deeper.
 	if ($item->deeper)
 	{
-		echo '<ul class="mod-menu__sub list-unstyled small">';
+		echo '<ul class="nav-child unstyled small">';
 	}
 	// The next item is shallower.
 	elseif ($item->shallower)

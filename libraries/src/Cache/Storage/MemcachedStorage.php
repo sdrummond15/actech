@@ -8,12 +8,11 @@
 
 namespace Joomla\CMS\Cache\Storage;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Cache\Cache;
 use Joomla\CMS\Cache\CacheStorage;
 use Joomla\CMS\Cache\Exception\CacheConnectingException;
-use Joomla\CMS\Factory;
 
 /**
  * Memcached cache storage handler
@@ -50,7 +49,7 @@ class MemcachedStorage extends CacheStorage
 	{
 		parent::__construct($options);
 
-		$this->_compress = Factory::getApplication()->get('memcached_compress', false) ? \Memcached::OPT_COMPRESSION : 0;
+		$this->_compress = \JFactory::getConfig()->get('memcached_compress', false) ? \Memcached::OPT_COMPRESSION : 0;
 
 		if (static::$_db === null)
 		{
@@ -73,14 +72,14 @@ class MemcachedStorage extends CacheStorage
 			throw new \RuntimeException('Memcached Extension is not available');
 		}
 
-		$app = Factory::getApplication();
+		$config = \JFactory::getConfig();
 
-		$host = $app->get('memcached_server_host', 'localhost');
-		$port = $app->get('memcached_server_port', 11211);
+		$host = $config->get('memcached_server_host', 'localhost');
+		$port = $config->get('memcached_server_port', 11211);
 
 
 		// Create the memcached connection
-		if ($app->get('memcached_persist', true))
+		if ($config->get('memcached_persist', true))
 		{
 			static::$_db = new \Memcached($this->_hash);
 			$servers = static::$_db->getServerList();
@@ -129,7 +128,7 @@ class MemcachedStorage extends CacheStorage
 	protected function _getCacheId($id, $group)
 	{
 		$prefix   = Cache::getPlatformPrefix();
-		$length   = \strlen($prefix);
+		$length   = strlen($prefix);
 		$cache_id = parent::_getCacheId($id, $group);
 
 		if ($length)
@@ -188,7 +187,7 @@ class MemcachedStorage extends CacheStorage
 
 		$data = array();
 
-		if (\is_array($keys))
+		if (is_array($keys))
 		{
 			foreach ($keys as $key)
 			{
@@ -199,7 +198,7 @@ class MemcachedStorage extends CacheStorage
 
 				$namearr = explode('-', $key->name);
 
-				if ($namearr !== false && $namearr[0] == $secret && $namearr[1] === 'cache')
+				if ($namearr !== false && $namearr[0] == $secret && $namearr[1] == 'cache')
 				{
 					$group = $namearr[2];
 
@@ -244,14 +243,14 @@ class MemcachedStorage extends CacheStorage
 
 		$index = static::$_db->get($this->_hash . '-index');
 
-		if (!\is_array($index))
+		if (!is_array($index))
 		{
 			$index = array();
 		}
 
 		$tmparr       = new \stdClass;
 		$tmparr->name = $cache_id;
-		$tmparr->size = \strlen($data);
+		$tmparr->size = strlen($data);
 
 		$index[] = $tmparr;
 		static::$_db->set($this->_hash . '-index', $index, 0);
@@ -283,7 +282,7 @@ class MemcachedStorage extends CacheStorage
 
 		$index = static::$_db->get($this->_hash . '-index');
 
-		if (\is_array($index))
+		if (is_array($index))
 		{
 			foreach ($index as $key => $value)
 			{
@@ -323,13 +322,13 @@ class MemcachedStorage extends CacheStorage
 
 		$index = static::$_db->get($this->_hash . '-index');
 
-		if (\is_array($index))
+		if (is_array($index))
 		{
 			$prefix = $this->_hash . '-cache-' . $group . '-';
 
 			foreach ($index as $key => $value)
 			{
-				if (strpos($value->name, $prefix) === 0 xor $mode !== 'group')
+				if (strpos($value->name, $prefix) === 0 xor $mode != 'group')
 				{
 					static::$_db->delete($value->name);
 					unset($index[$key]);

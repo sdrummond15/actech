@@ -9,14 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Authentication\Authentication;
-use Joomla\CMS\Filter\InputFilter;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Log\Log;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\User\User;
-use Joomla\CMS\User\UserHelper;
-
 /**
  * Joomla Authentication plugin
  *
@@ -24,12 +16,12 @@ use Joomla\CMS\User\UserHelper;
  * @note   Code based on http://jaspan.com/improved_persistent_login_cookie_best_practice
  *         and http://fishbowl.pastiche.org/2004/01/19/persistent_login_cookie_best_practice/
  */
-class PlgAuthenticationCookie extends CMSPlugin
+class PlgAuthenticationCookie extends JPlugin
 {
 	/**
 	 * Application object
 	 *
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * @var    JApplicationCms
 	 * @since  3.2
 	 */
 	protected $app;
@@ -37,7 +29,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 	/**
 	 * Database object
 	 *
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * @var    JDatabaseDriver
 	 * @since  3.2
 	 */
 	protected $db;
@@ -54,9 +46,9 @@ class PlgAuthenticationCookie extends CMSPlugin
 		$this->loadLanguage();
 
 		return array(
-			Text::_('PLG_AUTHENTICATION_COOKIE') => array(
-				Text::_('PLG_AUTHENTICATION_COOKIE_PRIVACY_CAPABILITY_COOKIE'),
-			),
+			JText::_('PLG_AUTHENTICATION_COOKIE') => array(
+				JText::_('PLG_AUTH_COOKIE_PRIVACY_CAPABILITY_COOKIE'),
+			)
 		);
 	}
 
@@ -80,13 +72,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 		}
 
 		// Get cookie
-		$cookieName  = 'joomla_remember_me_' . UserHelper::getShortHashedUserAgent();
+		$cookieName  = 'joomla_remember_me_' . JUserHelper::getShortHashedUserAgent();
 		$cookieValue = $this->app->input->cookie->get($cookieName);
 
 		// Try with old cookieName (pre 3.6.0) if not found
 		if (!$cookieValue)
 		{
-			$cookieName  = UserHelper::getShortHashedUserAgent();
+			$cookieName  = JUserHelper::getShortHashedUserAgent();
 			$cookieValue = $this->app->input->cookie->get($cookieName);
 		}
 
@@ -102,7 +94,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		{
 			// Destroy the cookie in the browser.
 			$this->app->input->cookie->set($cookieName, '', 1, $this->app->get('cookie_path', '/'), $this->app->get('cookie_domain', ''));
-			Log::add('Invalid cookie detected.', Log::WARNING, 'error');
+			JLog::add('Invalid cookie detected.', JLog::WARNING, 'error');
 
 			return false;
 		}
@@ -110,15 +102,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 		$response->type = 'Cookie';
 
 		// Filter series since we're going to use it in the query
-		$filter = new InputFilter;
+		$filter = new JFilterInput;
 		$series = $filter->clean($cookieArray[1], 'ALNUM');
-		$now    = time();
 
 		// Remove expired tokens
 		$query = $this->db->getQuery(true)
-			->delete($this->db->quoteName('#__user_keys'))
-			->where($this->db->quoteName('time') . ' < :now')
-			->bind(':now', $now);
+			->delete('#__user_keys')
+			->where($this->db->quoteName('time') . ' < ' . $this->db->quote(time()));
 
 		try
 		{
@@ -131,13 +121,11 @@ class PlgAuthenticationCookie extends CMSPlugin
 
 		// Find the matching record if it exists.
 		$query = $this->db->getQuery(true)
-			->select($this->db->quoteName(['user_id', 'token', 'series', 'time']))
+			->select($this->db->quoteName(array('user_id', 'token', 'series', 'time')))
 			->from($this->db->quoteName('#__user_keys'))
-			->where($this->db->quoteName('series') . ' = :series')
-			->where($this->db->quoteName('uastring') . ' = :uastring')
-			->order($this->db->quoteName('time') . ' DESC')
-			->bind(':series', $series)
-			->bind(':uastring', $cookieName);
+			->where($this->db->quoteName('series') . ' = ' . $this->db->quote($series))
+			->where($this->db->quoteName('uastring') . ' = ' . $this->db->quote($cookieName))
+			->order($this->db->quoteName('time') . ' DESC');
 
 		try
 		{
@@ -145,7 +133,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		}
 		catch (RuntimeException $e)
 		{
-			$response->status = Authentication::STATUS_FAILURE;
+			$response->status = JAuthentication::STATUS_FAILURE;
 
 			return false;
 		}
@@ -154,13 +142,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 		{
 			// Destroy the cookie in the browser.
 			$this->app->input->cookie->set($cookieName, '', 1, $this->app->get('cookie_path', '/'), $this->app->get('cookie_domain', ''));
-			$response->status = Authentication::STATUS_FAILURE;
+			$response->status = JAuthentication::STATUS_FAILURE;
 
 			return false;
 		}
 
 		// We have a user with one cookie with a valid series and a corresponding record in the database.
-		if (!UserHelper::verifyPassword($cookieArray[0], $results[0]->token))
+		if (!JUserHelper::verifyPassword($cookieArray[0], $results[0]->token))
 		{
 			/*
 			 * This is a real attack!
@@ -168,9 +156,8 @@ class PlgAuthenticationCookie extends CMSPlugin
 			 * Delete all tokens for this user!
 			 */
 			$query = $this->db->getQuery(true)
-				->delete($this->db->quoteName('#__user_keys'))
-				->where($this->db->quoteName('user_id') . ' = :userid')
-				->bind(':userid', $results[0]->user_id);
+				->delete('#__user_keys')
+				->where($this->db->quoteName('user_id') . ' = ' . $this->db->quote($results[0]->user_id));
 
 			try
 			{
@@ -179,9 +166,9 @@ class PlgAuthenticationCookie extends CMSPlugin
 			catch (RuntimeException $e)
 			{
 				// Log an alert for the site admin
-				Log::add(
+				JLog::add(
 					sprintf('Failed to delete cookie token for user %s with the following error: %s', $results[0]->user_id, $e->getMessage()),
-					Log::WARNING,
+					JLog::WARNING,
 					'security'
 				);
 			}
@@ -190,19 +177,18 @@ class PlgAuthenticationCookie extends CMSPlugin
 			$this->app->input->cookie->set($cookieName, '', 1, $this->app->get('cookie_path', '/'), $this->app->get('cookie_domain', ''));
 
 			// Issue warning by email to user and/or admin?
-			Log::add(Text::sprintf('PLG_AUTHENTICATION_COOKIE_ERROR_LOG_LOGIN_FAILED', $results[0]->user_id), Log::WARNING, 'security');
-			$response->status = Authentication::STATUS_FAILURE;
+			JLog::add(JText::sprintf('PLG_AUTH_COOKIE_ERROR_LOG_LOGIN_FAILED', $results[0]->user_id), JLog::WARNING, 'security');
+			$response->status = JAuthentication::STATUS_FAILURE;
 
 			return false;
 		}
 
 		// Make sure there really is a user with this name and get the data for the session.
 		$query = $this->db->getQuery(true)
-			->select($this->db->quoteName(['id', 'username', 'password']))
+			->select($this->db->quoteName(array('id', 'username', 'password')))
 			->from($this->db->quoteName('#__users'))
-			->where($this->db->quoteName('username') . ' = :userid')
-			->where($this->db->quoteName('requireReset') . ' = 0')
-			->bind(':userid', $results[0]->user_id);
+			->where($this->db->quoteName('username') . ' = ' . $this->db->quote($results[0]->user_id))
+			->where($this->db->quoteName('requireReset') . ' = 0');
 
 		try
 		{
@@ -210,7 +196,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		}
 		catch (RuntimeException $e)
 		{
-			$response->status = Authentication::STATUS_FAILURE;
+			$response->status = JAuthentication::STATUS_FAILURE;
 
 			return false;
 		}
@@ -218,7 +204,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		if ($result)
 		{
 			// Bring this in line with the rest of the system
-			$user = User::getInstance($result->id);
+			$user = JUser::getInstance($result->id);
 
 			// Set response data.
 			$response->username = $result->username;
@@ -228,13 +214,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 			$response->language = $user->getParam('language');
 
 			// Set response status.
-			$response->status        = Authentication::STATUS_SUCCESS;
+			$response->status        = JAuthentication::STATUS_SUCCESS;
 			$response->error_message = '';
 		}
 		else
 		{
-			$response->status        = Authentication::STATUS_FAILURE;
-			$response->error_message = Text::_('JGLOBAL_AUTH_NO_USER');
+			$response->status        = JAuthentication::STATUS_FAILURE;
+			$response->error_message = JText::_('JGLOBAL_AUTH_NO_USER');
 		}
 	}
 
@@ -260,7 +246,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		if (isset($options['responseType']) && $options['responseType'] === 'Cookie')
 		{
 			// Logged in using a cookie
-			$cookieName = 'joomla_remember_me_' . UserHelper::getShortHashedUserAgent();
+			$cookieName = 'joomla_remember_me_' . JUserHelper::getShortHashedUserAgent();
 
 			// We need the old data to get the existing series
 			$cookieValue = $this->app->input->cookie->get($cookieName);
@@ -268,7 +254,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 			// Try with old cookieName (pre 3.6.0) if not found
 			if (!$cookieValue)
 			{
-				$oldCookieName = UserHelper::getShortHashedUserAgent();
+				$oldCookieName = JUserHelper::getShortHashedUserAgent();
 				$cookieValue   = $this->app->input->cookie->get($oldCookieName);
 
 				// Destroy the old cookie in the browser
@@ -278,13 +264,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 			$cookieArray = explode('.', $cookieValue);
 
 			// Filter series since we're going to use it in the query
-			$filter = new InputFilter;
+			$filter = new JFilterInput;
 			$series = $filter->clean($cookieArray[1], 'ALNUM');
 		}
 		elseif (!empty($options['remember']))
 		{
 			// Remember checkbox is set
-			$cookieName = 'joomla_remember_me_' . UserHelper::getShortHashedUserAgent();
+			$cookieName = 'joomla_remember_me_' . JUserHelper::getShortHashedUserAgent();
 
 			// Create a unique series which will be used over the lifespan of the cookie
 			$unique     = false;
@@ -292,12 +278,11 @@ class PlgAuthenticationCookie extends CMSPlugin
 
 			do
 			{
-				$series = UserHelper::genRandomPassword(20);
+				$series = JUserHelper::genRandomPassword(20);
 				$query  = $this->db->getQuery(true)
 					->select($this->db->quoteName('series'))
 					->from($this->db->quoteName('#__user_keys'))
-					->where($this->db->quoteName('series') . ' = :series')
-					->bind(':series', $series);
+					->where($this->db->quoteName('series') . ' = ' . $this->db->quote($series));
 
 				try
 				{
@@ -332,7 +317,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 		$length   = $this->params->get('key_length', 16);
 
 		// Generate new cookie
-		$token       = UserHelper::genRandomPassword($length);
+		$token       = JUserHelper::genRandomPassword($length);
 		$cookieValue = $token . '.' . $series;
 
 		// Overwrite existing cookie with new value
@@ -350,37 +335,27 @@ class PlgAuthenticationCookie extends CMSPlugin
 
 		if (!empty($options['remember']))
 		{
-			$future = (time() + $lifetime);
-
 			// Create new record
 			$query
 				->insert($this->db->quoteName('#__user_keys'))
-				->set($this->db->quoteName('user_id') . ' = :userid')
-				->set($this->db->quoteName('series') . ' = :series')
-				->set($this->db->quoteName('uastring') . ' = :uastring')
-				->set($this->db->quoteName('time') . ' = :time')
-				->bind(':userid', $options['user']->username)
-				->bind(':series', $series)
-				->bind(':uastring', $cookieName)
-				->bind(':time', $future);
+				->set($this->db->quoteName('user_id') . ' = ' . $this->db->quote($options['user']->username))
+				->set($this->db->quoteName('series') . ' = ' . $this->db->quote($series))
+				->set($this->db->quoteName('uastring') . ' = ' . $this->db->quote($cookieName))
+				->set($this->db->quoteName('time') . ' = ' . (time() + $lifetime));
 		}
 		else
 		{
 			// Update existing record with new token
 			$query
 				->update($this->db->quoteName('#__user_keys'))
-				->where($this->db->quoteName('user_id') . ' = :userid')
-				->where($this->db->quoteName('series') . ' = :series')
-				->where($this->db->quoteName('uastring') . ' = :uastring')
-				->bind(':userid', $options['user']->username)
-				->bind(':series', $series)
-				->bind(':uastring', $cookieName);
+				->where($this->db->quoteName('user_id') . ' = ' . $this->db->quote($options['user']->username))
+				->where($this->db->quoteName('series') . ' = ' . $this->db->quote($series))
+				->where($this->db->quoteName('uastring') . ' = ' . $this->db->quote($cookieName));
 		}
 
-		$hashedToken = UserHelper::hashPassword($token);
+		$hashedToken = JUserHelper::hashPassword($token);
 
-		$query->set($this->db->quoteName('token') . ' = :token')
-			->bind(':token', $hashedToken);
+		$query->set($this->db->quoteName('token') . ' = ' . $this->db->quote($hashedToken));
 
 		try
 		{
@@ -411,7 +386,7 @@ class PlgAuthenticationCookie extends CMSPlugin
 			return false;
 		}
 
-		$cookieName  = 'joomla_remember_me_' . UserHelper::getShortHashedUserAgent();
+		$cookieName  = 'joomla_remember_me_' . JUserHelper::getShortHashedUserAgent();
 		$cookieValue = $this->app->input->cookie->get($cookieName);
 
 		// There are no cookies to delete.
@@ -423,14 +398,13 @@ class PlgAuthenticationCookie extends CMSPlugin
 		$cookieArray = explode('.', $cookieValue);
 
 		// Filter series since we're going to use it in the query
-		$filter = new InputFilter;
+		$filter = new JFilterInput;
 		$series = $filter->clean($cookieArray[1], 'ALNUM');
 
 		// Remove the record from the database
 		$query = $this->db->getQuery(true)
-			->delete($this->db->quoteName('#__user_keys'))
-			->where($this->db->quoteName('series') . ' = :series')
-			->bind(':series', $series);
+			->delete('#__user_keys')
+			->where($this->db->quoteName('series') . ' = ' . $this->db->quote($series));
 
 		try
 		{

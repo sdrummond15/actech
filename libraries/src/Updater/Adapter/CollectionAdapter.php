@@ -8,12 +8,12 @@
 
 namespace Joomla\CMS\Updater\Adapter;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Application\ApplicationHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Filter\InputFilter;
-use Joomla\CMS\Language\Text;
+use Joomla\CMS\Log\Log;
 use Joomla\CMS\Table\Table;
 use Joomla\CMS\Updater\UpdateAdapter;
 use Joomla\CMS\Version;
@@ -44,7 +44,7 @@ class CollectionAdapter extends UpdateAdapter
 	/**
 	 * Used to control if an item has a child or not
 	 *
-	 * @var    integer
+	 * @var    boolean
 	 * @since  1.7.0
 	 */
 	protected $pop_parent = 0;
@@ -66,7 +66,7 @@ class CollectionAdapter extends UpdateAdapter
 	/**
 	 * Gets the reference to the current direct parent
 	 *
-	 * @return  string
+	 * @return  object
 	 *
 	 * @since   1.7.0
 	 */
@@ -129,11 +129,11 @@ class CollectionAdapter extends UpdateAdapter
 				foreach ($this->updatecols as $col)
 				{
 					// Reset the values if it doesn't exist
-					if (!\array_key_exists($col, $attrs))
+					if (!array_key_exists($col, $attrs))
 					{
 						$attrs[$col] = '';
 
-						if ($col === 'CLIENT')
+						if ($col == 'CLIENT')
 						{
 							$attrs[$col] = 'site';
 						}
@@ -175,7 +175,7 @@ class CollectionAdapter extends UpdateAdapter
 				// Set this to ourself as a default
 				if (!isset($values['targetplatformversion']))
 				{
-					$values['targetplatformversion'] = $ver::MAJOR_VERSION . '.' . $ver::MINOR_VERSION;
+					$values['targetplatformversion'] = $ver::RELEASE;
 				}
 
 				// Set this to ourselves as a default
@@ -204,10 +204,15 @@ class CollectionAdapter extends UpdateAdapter
 	{
 		array_pop($this->stack);
 
-		if ($name === 'CATEGORY' && $this->pop_parent)
+		switch ($name)
 		{
-			$this->pop_parent = 0;
-			array_pop($this->parent);
+			case 'CATEGORY':
+				if ($this->pop_parent)
+				{
+					$this->pop_parent = 0;
+					array_pop($this->parent);
+				}
+				break;
 		}
 	}
 
@@ -218,7 +223,7 @@ class CollectionAdapter extends UpdateAdapter
 	 *
 	 * @param   array  $options  Options to use: update_site_id: the unique ID of the update site to look at
 	 *
-	 * @return  array|boolean  Update_sites and updates discovered. False on failure
+	 * @return  array  Update_sites and updates discovered
 	 *
 	 * @since   1.7.0
 	 */
@@ -238,21 +243,22 @@ class CollectionAdapter extends UpdateAdapter
 		if (!xml_parse($this->xmlParser, $response->body))
 		{
 			// If the URL is missing the .xml extension, try appending it and retry loading the update
-			if (!$this->appendExtension && (substr($this->_url, -4) !== '.xml'))
+			if (!$this->appendExtension && (substr($this->_url, -4) != '.xml'))
 			{
 				$options['append_extension'] = true;
 
 				return $this->findUpdate($options);
 			}
 
+			Log::add('Error parsing url: ' . $this->_url, Log::WARNING, 'updater');
+
 			$app = Factory::getApplication();
-			$app->getLogger()->warning("Error parsing url: {$this->_url}", array('category' => 'updater'));
-			$app->enqueueMessage(Text::sprintf('JLIB_UPDATER_ERROR_COLLECTION_PARSE_URL', $this->_url), 'warning');
+			$app->enqueueMessage(\JText::sprintf('JLIB_UPDATER_ERROR_COLLECTION_PARSE_URL', $this->_url), 'warning');
 
 			return false;
 		}
 
-		// @todo: Decrement the bad counter if non-zero
+		// TODO: Decrement the bad counter if non-zero
 		return array('update_sites' => $this->update_sites, 'updates' => $this->updates);
 	}
 }

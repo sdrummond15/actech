@@ -9,16 +9,6 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Cache\Cache;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Http\HttpFactory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Layout\FileLayout;
-use Joomla\CMS\Log\Log;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\CMS\Uri\Uri;
-use Joomla\CMS\User\UserHelper;
-
 // Uncomment the following line to enable debug mode for testing purposes. Note: statistics will be sent on every page load
 // define('PLG_SYSTEM_STATS_DEBUG', 1);
 
@@ -28,36 +18,44 @@ use Joomla\CMS\User\UserHelper;
  *
  * @since  3.5
  */
-class PlgSystemStats extends CMSPlugin
+class PlgSystemStats extends JPlugin
 {
 	/**
 	 * Indicates sending statistics is always allowed.
 	 *
 	 * @var    integer
-	 *
 	 * @since  3.5
 	 */
 	const MODE_ALLOW_ALWAYS = 1;
 
 	/**
+	 * Indicates sending statistics is only allowed one time.
+	 *
+	 * @var    integer
+	 * @since  3.5
+	 */
+	const MODE_ALLOW_ONCE = 2;
+
+	/**
 	 * Indicates sending statistics is never allowed.
 	 *
 	 * @var    integer
-	 *
 	 * @since  3.5
 	 */
 	const MODE_ALLOW_NEVER = 3;
 
 	/**
-	 * @var    \Joomla\CMS\Application\CMSApplication
+	 * Application object
 	 *
+	 * @var    JApplicationCms
 	 * @since  3.5
 	 */
 	protected $app;
 
 	/**
-	 * @var    \Joomla\Database\DatabaseDriver
+	 * Database object
 	 *
+	 * @var    JDatabaseDriver
 	 * @since  3.5
 	 */
 	protected $db;
@@ -66,7 +64,6 @@ class PlgSystemStats extends CMSPlugin
 	 * URL to send the statistics.
 	 *
 	 * @var    string
-	 *
 	 * @since  3.5
 	 */
 	protected $serverUrl = 'https://developer.joomla.org/stats/submit';
@@ -75,7 +72,6 @@ class PlgSystemStats extends CMSPlugin
 	 * Unique identifier for this site
 	 *
 	 * @var    string
-	 *
 	 * @since  3.5
 	 */
 	protected $uniqueId;
@@ -99,46 +95,16 @@ class PlgSystemStats extends CMSPlugin
 			return;
 		}
 
-		if (Uri::getInstance()->getVar('tmpl') === 'component')
+		if (JUri::getInstance()->getVar('tmpl') === 'component')
 		{
 			return;
 		}
 
 		// Load plugin language files only when needed (ex: they are not needed in site client).
 		$this->loadLanguage();
-	}
 
-	/**
-	 * Listener for the `onAfterDispatch` event
-	 *
-	 * @return  void
-	 *
-	 * @since   4.0.0
-	 */
-	public function onAfterDispatch()
-	{
-		if (!$this->app->isClient('administrator') || !$this->isAllowedUser())
-		{
-			return;
-		}
-
-		if (!$this->isDebugEnabled() && !$this->isUpdateRequired())
-		{
-			return;
-		}
-
-		if (Uri::getInstance()->getVar('tmpl') === 'component')
-		{
-			return;
-		}
-
-		if ($this->app->getDocument()->getType() !== 'html')
-		{
-			return;
-		}
-
-		$this->app->getDocument()->getWebAssetManager()
-			->registerAndUseScript('plg_system_stats.message', 'plg_system_stats/stats-message.js', [], ['defer' => true], ['core']);
+		JHtml::_('jquery.framework');
+		JHtml::_('script', 'plg_system_stats/stats.js', array('version' => 'auto', 'relative' => true));
 	}
 
 	/**
@@ -155,7 +121,7 @@ class PlgSystemStats extends CMSPlugin
 	{
 		if (!$this->isAllowedUser() || !$this->isAjaxRequest())
 		{
-			throw new Exception(Text::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
+			throw new Exception(JText::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
 		}
 
 		$this->params->set('mode', static::MODE_ALLOW_ALWAYS);
@@ -165,7 +131,9 @@ class PlgSystemStats extends CMSPlugin
 			throw new RuntimeException('Unable to save plugin settings', 500);
 		}
 
-		echo json_encode(['sent' => (int) $this->sendStats()]);
+		$this->sendStats();
+
+		echo json_encode(array('sent' => 1));
 	}
 
 	/**
@@ -182,7 +150,7 @@ class PlgSystemStats extends CMSPlugin
 	{
 		if (!$this->isAllowedUser() || !$this->isAjaxRequest())
 		{
-			throw new Exception(Text::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
+			throw new Exception(JText::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
 		}
 
 		$this->params->set('mode', static::MODE_ALLOW_NEVER);
@@ -192,12 +160,36 @@ class PlgSystemStats extends CMSPlugin
 			throw new RuntimeException('Unable to save plugin settings', 500);
 		}
 
-		if (!$this->disablePlugin())
+		echo json_encode(array('sent' => 0));
+	}
+
+	/**
+	 * User selected to send data once.
+	 *
+	 * @return  void
+	 *
+	 * @since   3.5
+	 *
+	 * @throws  Exception         If user is not allowed.
+	 * @throws  RuntimeException  If there is an error saving the params or sending the data.
+	 */
+	public function onAjaxSendOnce()
+	{
+		if (!$this->isAllowedUser() || !$this->isAjaxRequest())
 		{
-			throw new RuntimeException('Unable to disable the statistics plugin', 500);
+			throw new Exception(JText::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
 		}
 
-		echo json_encode(['sent' => 0]);
+		$this->params->set('mode', static::MODE_ALLOW_ONCE);
+
+		if (!$this->saveParams())
+		{
+			throw new RuntimeException('Unable to save plugin settings', 500);
+		}
+
+		$this->sendStats();
+
+		echo json_encode(array('sent' => 1));
 	}
 
 	/**
@@ -209,22 +201,22 @@ class PlgSystemStats extends CMSPlugin
 	 * @since   3.5
 	 *
 	 * @throws  Exception         If user is not allowed.
-	 * @throws  RuntimeException  If there is an error saving the params, disabling the plugin or sending the data.
+	 * @throws  RuntimeException  If there is an error saving the params or sending the data.
 	 */
 	public function onAjaxSendStats()
 	{
 		if (!$this->isAllowedUser() || !$this->isAjaxRequest())
 		{
-			throw new Exception(Text::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
+			throw new Exception(JText::_('JGLOBAL_AUTH_ACCESS_DENIED'), 403);
 		}
 
 		// User has not selected the mode. Show message.
 		if ((int) $this->params->get('mode') !== static::MODE_ALLOW_ALWAYS)
 		{
-			$data = [
+			$data = array(
 				'sent' => 0,
-				'html' => $this->getRenderer('message')->render($this->getLayoutData()),
-			];
+				'html' => $this->getRenderer('message')->render($this->getLayoutData())
+			);
 
 			echo json_encode($data);
 
@@ -236,7 +228,9 @@ class PlgSystemStats extends CMSPlugin
 			throw new RuntimeException('Unable to save plugin settings', 500);
 		}
 
-		echo json_encode(['sent' => (int) $this->sendStats()]);
+		$this->sendStats();
+
+		echo json_encode(array('sent' => 1));
 	}
 
 	/**
@@ -263,7 +257,7 @@ class PlgSystemStats extends CMSPlugin
 	 *
 	 * @since   3.5
 	 */
-	public function debug($layoutId, $data = [])
+	public function debug($layoutId, $data = array())
 	{
 		$data = array_merge($this->getLayoutData(), $data);
 
@@ -279,11 +273,11 @@ class PlgSystemStats extends CMSPlugin
 	 */
 	protected function getLayoutData()
 	{
-		return [
+		return array(
 			'plugin'       => $this,
 			'pluginParams' => $this->params,
-			'statsData'    => $this->getStatsData(),
-		];
+			'statsData'    => $this->getStatsData()
+		);
 	}
 
 	/**
@@ -295,12 +289,12 @@ class PlgSystemStats extends CMSPlugin
 	 */
 	protected function getLayoutPaths()
 	{
-		$template = Factory::getApplication()->getTemplate();
+		$template = JFactory::getApplication()->getTemplate();
 
-		return [
+		return array(
 			JPATH_ADMINISTRATOR . '/templates/' . $template . '/html/layouts/plugins/' . $this->_type . '/' . $this->_name,
 			__DIR__ . '/layouts',
-		];
+		);
 	}
 
 	/**
@@ -308,13 +302,13 @@ class PlgSystemStats extends CMSPlugin
 	 *
 	 * @param   string  $layoutId  Layout identifier
 	 *
-	 * @return  \Joomla\CMS\Layout\LayoutInterface
+	 * @return  JLayout
 	 *
 	 * @since   3.5
 	 */
 	protected function getRenderer($layoutId = 'default')
 	{
-		$renderer = new FileLayout($layoutId);
+		$renderer = new JLayoutFile($layoutId);
 
 		$renderer->setIncludePaths($this->getLayoutPaths());
 
@@ -330,14 +324,14 @@ class PlgSystemStats extends CMSPlugin
 	 */
 	private function getStatsData()
 	{
-		$data = [
+		$data = array(
 			'unique_id'   => $this->getUniqueId(),
 			'php_version' => PHP_VERSION,
 			'db_type'     => $this->db->name,
 			'db_version'  => $this->db->getVersion(),
 			'cms_version' => JVERSION,
-			'server_os'   => php_uname('s') . ' ' . php_uname('r'),
-		];
+			'server_os'   => php_uname('s') . ' ' . php_uname('r')
+		);
 
 		// Check if we have a MariaDB version string and extract the proper version from it
 		if (preg_match('/^(?:5\.5\.5-)?(mariadb-)?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)/i', $data['db_version'], $versionParts))
@@ -359,7 +353,7 @@ class PlgSystemStats extends CMSPlugin
 	{
 		if (null === $this->uniqueId)
 		{
-			$this->uniqueId = $this->params->get('unique_id', hash('sha1', UserHelper::genRandomPassword(28) . time()));
+			$this->uniqueId = $this->params->get('unique_id', hash('sha1', JUserHelper::genRandomPassword(28) . time()));
 		}
 
 		return $this->uniqueId;
@@ -374,7 +368,7 @@ class PlgSystemStats extends CMSPlugin
 	 */
 	private function isAllowedUser()
 	{
-		return Factory::getUser()->authorise('core.admin');
+		return JFactory::getUser()->authorise('core.admin');
 	}
 
 	/**
@@ -413,7 +407,7 @@ class PlgSystemStats extends CMSPlugin
 			return true;
 		}
 
-		return abs(time() - $last) > $interval * 3600;
+		return (abs(time() - $last) > $interval * 3600);
 	}
 
 	/**
@@ -438,7 +432,7 @@ class PlgSystemStats extends CMSPlugin
 	 *
 	 * @since   3.5
 	 */
-	public function render($layoutId, $data = [])
+	public function render($layoutId, $data = array())
 	{
 		$data = array_merge($this->getLayoutData(), $data);
 
@@ -460,21 +454,17 @@ class PlgSystemStats extends CMSPlugin
 		$interval = (int) $this->params->get('interval', 12);
 		$this->params->set('interval', $interval ?: 12);
 
-		$paramsJson = $this->params->toString('JSON');
-		$db         = $this->db;
-
-		$query = $db->getQuery(true)
-			->update($db->quoteName('#__extensions'))
-			->set($db->quoteName('params') . ' = :params')
-			->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
-			->where($db->quoteName('folder') . ' = ' . $db->quote('system'))
-			->where($db->quoteName('element') . ' = ' . $db->quote('stats'))
-			->bind(':params', $paramsJson);
+		$query = $this->db->getQuery(true)
+				->update($this->db->quoteName('#__extensions'))
+				->set($this->db->quoteName('params') . ' = ' . $this->db->quote($this->params->toString('JSON')))
+				->where($this->db->quoteName('type') . ' = ' . $this->db->quote('plugin'))
+				->where($this->db->quoteName('folder') . ' = ' . $this->db->quote('system'))
+				->where($this->db->quoteName('element') . ' = ' . $this->db->quote('stats'));
 
 		try
 		{
 			// Lock the tables to prevent multiple plugin executions causing a race condition
-			$db->lockTable('#__extensions');
+			$this->db->lockTable('#__extensions');
 		}
 		catch (Exception $e)
 		{
@@ -485,21 +475,21 @@ class PlgSystemStats extends CMSPlugin
 		try
 		{
 			// Update the plugin parameters
-			$result = $db->setQuery($query)->execute();
+			$result = $this->db->setQuery($query)->execute();
 
-			$this->clearCacheGroups(['com_plugins']);
+			$this->clearCacheGroups(array('com_plugins'), array(0, 1));
 		}
 		catch (Exception $exc)
 		{
 			// If we failed to execute
-			$db->unlockTables();
+			$this->db->unlockTables();
 			$result = false;
 		}
 
 		try
 		{
 			// Unlock the tables after writing
-			$db->unlockTables();
+			$this->db->unlockTables();
 		}
 		catch (Exception $e)
 		{
@@ -517,56 +507,36 @@ class PlgSystemStats extends CMSPlugin
 	 *
 	 * @since   3.5
 	 *
-	 * @throws  RuntimeException  If there is an error sending the data and debug mode enabled.
+	 * @throws  RuntimeException  If there is an error sending the data.
 	 */
 	private function sendStats()
 	{
-		$error = false;
-
 		try
 		{
 			// Don't let the request take longer than 2 seconds to avoid page timeout issues
-			$response = HttpFactory::getHttp()->post($this->serverUrl, $this->getStatsData(), [], 2);
-
-			if (!$response)
-			{
-				$error = 'Could not send site statistics to remote server: No response';
-			}
-			elseif ($response->code !== 200)
-			{
-				$data = json_decode($response->body);
-
-				$error = 'Could not send site statistics to remote server: ' . $data->message;
-			}
+			$response = JHttpFactory::getHttp()->post($this->serverUrl, $this->getStatsData(), null, 2);
 		}
 		catch (UnexpectedValueException $e)
 		{
 			// There was an error sending stats. Should we do anything?
-			$error = 'Could not send site statistics to remote server: ' . $e->getMessage();
+			throw new RuntimeException('Could not send site statistics to remote server: ' . $e->getMessage(), 500);
 		}
 		catch (RuntimeException $e)
 		{
 			// There was an error connecting to the server or in the post request
-			$error = 'Could not connect to statistics server: ' . $e->getMessage();
+			throw new RuntimeException('Could not connect to statistics server: ' . $e->getMessage(), 500);
 		}
 		catch (Exception $e)
 		{
 			// An unexpected error in processing; don't let this failure kill the site
-			$error = 'Unexpected error connecting to statistics server: ' . $e->getMessage();
+			throw new RuntimeException('Unexpected error connecting to statistics server: ' . $e->getMessage(), 500);
 		}
 
-		if ($error !== false)
+		if ($response->code !== 200)
 		{
-			// Log any errors if logging enabled.
-			Log::add($error, Log::WARNING, 'jerror');
+			$data = json_decode($response->body);
 
-			// If Stats debug mode enabled, or Global Debug mode enabled, show error to the user.
-			if ($this->isDebugEnabled() || $this->app->get('debug'))
-			{
-				throw new RuntimeException($error, 500);
-			}
-
-			return false;
+			throw new RuntimeException('Could not send site statistics to remote server: ' . $data->message, $response->code);
 		}
 
 		return true;
@@ -575,88 +545,34 @@ class PlgSystemStats extends CMSPlugin
 	/**
 	 * Clears cache groups. We use it to clear the plugins cache after we update the last run timestamp.
 	 *
-	 * @param   array  $clearGroups  The cache groups to clean
+	 * @param   array  $clearGroups   The cache groups to clean
+	 * @param   array  $cacheClients  The cache clients (site, admin) to clean
 	 *
 	 * @return  void
 	 *
 	 * @since   3.5
 	 */
-	private function clearCacheGroups(array $clearGroups)
+	private function clearCacheGroups(array $clearGroups, array $cacheClients = array(0, 1))
 	{
 		foreach ($clearGroups as $group)
 		{
-			try
+			foreach ($cacheClients as $client_id)
 			{
-				$options = [
-					'defaultgroup' => $group,
-					'cachebase'    => $this->app->get('cache_path', JPATH_CACHE),
-				];
+				try
+				{
+					$options = array(
+						'defaultgroup' => $group,
+						'cachebase'    => $client_id ? JPATH_ADMINISTRATOR . '/cache' : $this->app->get('cache_path', JPATH_SITE . '/cache')
+					);
 
-				$cache = Cache::getInstance('callback', $options);
-				$cache->clean();
+					$cache = JCache::getInstance('callback', $options);
+					$cache->clean();
+				}
+				catch (Exception $e)
+				{
+					// Ignore it
+				}
 			}
-			catch (Exception $e)
-			{
-				// Ignore it
-			}
 		}
-	}
-
-	/**
-	 * Disable this plugin, if user selects once or never, to stop Joomla loading the plugin on every page load and
-	 * therefore regaining a tiny bit of performance
-	 *
-	 * @since   4.0.0
-	 *
-	 * @return  boolean
-	 */
-	private function disablePlugin()
-	{
-		$db = $this->db;
-
-		$query = $db->getQuery(true)
-			->update($db->quoteName('#__extensions'))
-			->set($db->quoteName('enabled') . ' = 0')
-			->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
-			->where($db->quoteName('folder') . ' = ' . $db->quote('system'))
-			->where($db->quoteName('element') . ' = ' . $db->quote('stats'));
-
-		try
-		{
-			// Lock the tables to prevent multiple plugin executions causing a race condition
-			$db->lockTable('#__extensions');
-		}
-		catch (Exception $e)
-		{
-			// If we can't lock the tables it's too risky to continue execution
-			return false;
-		}
-
-		try
-		{
-			// Update the plugin parameters
-			$result = $db->setQuery($query)->execute();
-
-			$this->clearCacheGroups(['com_plugins']);
-		}
-		catch (Exception $exc)
-		{
-			// If we failed to execute
-			$db->unlockTables();
-			$result = false;
-		}
-
-		try
-		{
-			// Unlock the tables after writing
-			$db->unlockTables();
-		}
-		catch (Exception $e)
-		{
-			// If we can't lock the tables assume we have somehow failed
-			$result = false;
-		}
-
-		return $result;
 	}
 }

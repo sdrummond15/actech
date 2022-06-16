@@ -9,18 +9,83 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Layout\LayoutHelper;
-use Joomla\CMS\Plugin\CMSPlugin;
-use Joomla\Event\Event;
-
 /**
  * Plain Textarea Editor Plugin
  *
  * @since  1.5
  */
-class PlgEditorNone extends CMSPlugin
+class PlgEditorNone extends JPlugin
 {
+	/**
+	 * Method to handle the onInitEditor event.
+	 *  - Initialises the Editor
+	 *
+	 * @return  void
+	 *
+	 * @since 1.5
+	 */
+	public function onInit()
+	{
+		JHtml::_('script', 'editors/none/none.min.js', array('version' => 'auto', 'relative' => true));
+	}
+
+	/**
+	 * Copy editor content to form field.
+	 *
+	 * Not applicable in this editor.
+	 *
+	 * @param   string  $editor  the editor id
+	 *
+	 * @return  void
+	 *
+	 * @deprecated 4.0 Use directly the returned code
+	 */
+	public function onSave($editor)
+	{
+	}
+
+	/**
+	 * Get the editor content.
+	 *
+	 * @param   string  $id  The id of the editor field.
+	 *
+	 * @return  string
+	 *
+	 * @deprecated 4.0 Use directly the returned code
+	 */
+	public function onGetContent($id)
+	{
+		return 'Joomla.editors.instances[' . json_encode($id) . '].getValue();';
+	}
+
+	/**
+	 * Set the editor content.
+	 *
+	 * @param   string  $id    The id of the editor field.
+	 * @param   string  $html  The content to set.
+	 *
+	 * @return  string
+	 *
+	 * @deprecated 4.0 Use directly the returned code
+	 */
+	public function onSetContent($id, $html)
+	{
+		return 'Joomla.editors.instances[' . json_encode($id) . '].setValue(' . json_encode($html) . ');';
+	}
+
+	/**
+	 * Inserts html code into the editor
+	 *
+	 * @param   string  $id  The id of the editor field
+	 *
+	 * @return  void
+	 *
+	 * @deprecated 4.0
+	 */
+	public function onGetInsertMethod($id)
+	{
+	}
+
 	/**
 	 * Display the editor area.
 	 *
@@ -59,19 +124,13 @@ class PlgEditorNone extends CMSPlugin
 
 		$readonly = !empty($params['readonly']) ? ' readonly disabled' : '';
 
-		Factory::getDocument()->getWebAssetManager()
-			->registerAndUseScript(
-				'webcomponent.editor-none',
-				'plg_editors_none/joomla-editor-none.min.js',
-				[],
-				['type' => 'module']
-			);
-
-		return '<joomla-editor-none>'
+		$editor = '<div class="js-editor-none">'
 			. '<textarea name="' . $name . '" id="' . $id . '" cols="' . $col . '" rows="' . $row
 			. '" style="width: ' . $width . '; height: ' . $height . ';"' . $readonly . '>' . $content . '</textarea>'
-			. '</joomla-editor-none>'
-			. $this->_displayButtons($id, $buttons, $asset, $author);
+			. $this->_displayButtons($id, $buttons, $asset, $author)
+			. '</div>';
+
+		return $editor;
 	}
 
 	/**
@@ -88,18 +147,9 @@ class PlgEditorNone extends CMSPlugin
 	{
 		if (is_array($buttons) || (is_bool($buttons) && $buttons))
 		{
-			$buttonsEvent = new Event(
-				'getButtons',
-				[
-					'editor'    => $name,
-					'buttons' => $buttons,
-				]
-			);
+			$buttons = $this->_subject->getButtons($name, $buttons, $asset, $author);
 
-			$buttonsResult = $this->getDispatcher()->dispatch('getButtons', $buttonsEvent);
-			$buttons       = $buttonsResult['result'];
-
-			return LayoutHelper::render('joomla.editors.buttons', $buttons);
+			return JLayoutHelper::render('joomla.editors.buttons', $buttons);
 		}
 	}
 }

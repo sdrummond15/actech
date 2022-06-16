@@ -8,14 +8,8 @@
 
 namespace Joomla\CMS\Helper;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Cache\CacheControllerFactoryInterface;
-use Joomla\CMS\Cache\Controller\CallbackController;
-use Joomla\CMS\Cache\Exception\CacheExceptionInterface;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Log\Log;
 use Joomla\Registry\Registry;
 
 /**
@@ -51,7 +45,7 @@ class LibraryHelper
 			$result = static::$libraries[$element];
 
 			// Convert the params to an object.
-			if (\is_string($result->params))
+			if (is_string($result->params))
 			{
 				$result->params = new Registry($result->params);
 			}
@@ -102,7 +96,7 @@ class LibraryHelper
 	 * @param   string    $element  Element of the library in the extensions table.
 	 * @param   Registry  $params   Params to save
 	 *
-	 * @return  Registry|boolean  A Registry object.
+	 * @return  Registry  A Registry object.
 	 *
 	 * @see     Registry
 	 * @since   3.2
@@ -112,15 +106,12 @@ class LibraryHelper
 		if (static::isEnabled($element))
 		{
 			// Save params in DB
-			$db           = Factory::getDbo();
-			$paramsString = $params->toString();
-			$query        = $db->getQuery(true)
+			$db = \JFactory::getDbo();
+			$query = $db->getQuery(true)
 				->update($db->quoteName('#__extensions'))
-				->set($db->quoteName('params') . ' = :params')
+				->set($db->quoteName('params') . ' = ' . $db->quote($params->toString()))
 				->where($db->quoteName('type') . ' = ' . $db->quote('library'))
-				->where($db->quoteName('element') . ' = :element')
-				->bind(':params', $paramsString)
-				->bind(':element', $element);
+				->where($db->quoteName('element') . ' = ' . $db->quote($element));
 			$db->setQuery($query);
 
 			$result = $db->execute();
@@ -144,32 +135,46 @@ class LibraryHelper
 	 *
 	 * @return  boolean  True on success
 	 *
+	 * @since   3.2
+	 * @deprecated  4.0  Use LibraryHelper::loadLibrary() instead
+	 */
+	protected static function _load($element)
+	{
+		return static::loadLibrary($element);
+	}
+
+	/**
+	 * Load the installed library into the libraries property.
+	 *
+	 * @param   string  $element  The element value for the extension
+	 *
+	 * @return  boolean  True on success
+	 *
 	 * @since   3.7.0
 	 */
 	protected static function loadLibrary($element)
 	{
-		$loader = function ($element)
+		$loader = function($element)
 		{
-			$db = Factory::getDbo();
+			$db = \JFactory::getDbo();
 			$query = $db->getQuery(true)
-				->select($db->quoteName(['extension_id', 'element', 'params', 'enabled'], ['id', 'option', null, null]))
+				->select($db->quoteName(array('extension_id', 'element', 'params', 'enabled'), array('id', 'option', null, null)))
 				->from($db->quoteName('#__extensions'))
 				->where($db->quoteName('type') . ' = ' . $db->quote('library'))
-				->where($db->quoteName('element') . ' = :element')
-				->bind(':element', $element);
+				->where($db->quoteName('element') . ' = ' . $db->quote($element));
 			$db->setQuery($query);
 
 			return $db->loadObject();
 		};
 
-		/** @var CallbackController $cache */
-		$cache = Factory::getContainer()->get(CacheControllerFactoryInterface::class)->createCacheController('callback', ['defaultgroup' => '_system']);
+		/** @var \JCacheControllerCallback $cache */
+		$cache = \JFactory::getCache('_system', 'callback');
 
 		try
 		{
 			static::$libraries[$element] = $cache->get($loader, array($element), __METHOD__ . $element);
 		}
-		catch (CacheExceptionInterface $e)
+		catch (\JCacheException $e)
 		{
 			static::$libraries[$element] = $loader($element);
 		}
@@ -177,8 +182,8 @@ class LibraryHelper
 		if (empty(static::$libraries[$element]))
 		{
 			// Fatal error.
-			$error = Text::_('JLIB_APPLICATION_ERROR_LIBRARY_NOT_FOUND');
-			Log::add(Text::sprintf('JLIB_APPLICATION_ERROR_LIBRARY_NOT_LOADING', $element, $error), Log::WARNING, 'jerror');
+			$error = \JText::_('JLIB_APPLICATION_ERROR_LIBRARY_NOT_FOUND');
+			\JLog::add(\JText::sprintf('JLIB_APPLICATION_ERROR_LIBRARY_NOT_LOADING', $element, $error), \JLog::WARNING, 'jerror');
 
 			return false;
 		}

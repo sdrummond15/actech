@@ -8,25 +8,10 @@
 
 namespace Joomla\CMS\MVC\Controller;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Application\CMSApplication;
-use Joomla\CMS\Cache\Exception\CacheExceptionInterface;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filesystem\Path;
-use Joomla\CMS\Filter\InputFilter;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Log\Log;
 use Joomla\CMS\MVC\Factory\LegacyFactory;
 use Joomla\CMS\MVC\Factory\MVCFactoryInterface;
-use Joomla\CMS\MVC\Model\BaseDatabaseModel;
-use Joomla\CMS\MVC\Model\BaseModel;
-use Joomla\CMS\MVC\View\ViewInterface;
-use Joomla\CMS\Session\Session;
-use Joomla\CMS\Uri\Uri;
-use Joomla\Event\DispatcherAwareInterface;
-use Joomla\Event\DispatcherAwareTrait;
-use Joomla\Input\Input;
+
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Base class for a Joomla Controller
@@ -36,10 +21,8 @@ use Joomla\Input\Input;
  *
  * @since  2.5.5
  */
-class BaseController implements ControllerInterface, DispatcherAwareInterface
+class BaseController extends \JObject
 {
-	use DispatcherAwareTrait;
-
 	/**
 	 * The base path of the controller
 	 *
@@ -139,7 +122,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	/**
 	 * Hold a JInput object for easier access to the input variables.
 	 *
-	 * @var    Input
+	 * @var    \JInput
 	 * @since  3.0
 	 */
 	protected $input;
@@ -155,7 +138,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	/**
 	 * Instance container.
 	 *
-	 * @var    static
+	 * @var    \JControllerLegacy
 	 * @since  3.0
 	 */
 	protected static $instance;
@@ -163,18 +146,10 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	/**
 	 * Instance container containing the views.
 	 *
-	 * @var    ViewInterface[]
+	 * @var    \JViewLegacy[]
 	 * @since  3.4
 	 */
 	protected static $views;
-
-	/**
-	 * The Application
-	 *
-	 * @var    CMSApplication|null
-	 * @since  4.0.0
-	 */
-	protected $app;
 
 	/**
 	 * Adds to the stack of model paths in LIFO order.
@@ -185,11 +160,10 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @return  void
 	 *
 	 * @since   3.0
-	 * @deprecated  5.0 See \Joomla\CMS\MVC\Model\LegacyModelLoaderTrait::getInstance
 	 */
 	public static function addModelPath($path, $prefix = '')
 	{
-		BaseModel::addIncludePath($path, $prefix);
+		\JModelLegacy::addIncludePath($path, $prefix);
 	}
 
 	/**
@@ -251,42 +225,31 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $prefix  The prefix for the controller.
 	 * @param   array   $config  An array of optional constructor options.
 	 *
-	 * @return  static
+	 * @return  \JControllerLegacy
 	 *
-	 * @since       3.0
-	 * @deprecated  5.0 Get the controller through the MVCFactory instead
-	 * @throws      \Exception if the controller cannot be loaded.
+	 * @since   3.0
+	 * @throws  \Exception if the controller cannot be loaded.
 	 */
 	public static function getInstance($prefix, $config = array())
 	{
-		if (\is_object(self::$instance))
+		if (is_object(self::$instance))
 		{
 			return self::$instance;
 		}
 
-		@trigger_error(
-			sprintf(
-				'%1$s::getInstance() is deprecated. Load it through the MVC factory.',
-				self::class
-			),
-			E_USER_DEPRECATED
-		);
-
-		$app   = Factory::getApplication();
-		$input = $app->input;
+		$input = \JFactory::getApplication()->input;
 
 		// Get the environment configuration.
-		$basePath = \array_key_exists('base_path', $config) ? $config['base_path'] : JPATH_COMPONENT;
+		$basePath = array_key_exists('base_path', $config) ? $config['base_path'] : JPATH_COMPONENT;
 		$format   = $input->getWord('format');
 		$command  = $input->get('task', 'display');
 
 		// Check for array format.
-		$filter = InputFilter::getInstance();
+		$filter = \JFilterInput::getInstance();
 
-		if (\is_array($command))
+		if (is_array($command))
 		{
-			$keys = array_keys($command);
-			$command = $filter->clean(array_pop($keys), 'cmd');
+			$command = $filter->clean(array_pop(array_keys($command)), 'cmd');
 		}
 		else
 		{
@@ -326,52 +289,41 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		if (!class_exists($class))
 		{
 			// If the controller file path exists, include it.
-			if (is_file($path))
+			if (file_exists($path))
 			{
 				require_once $path;
 			}
-			elseif (isset($backuppath) && is_file($backuppath))
+			elseif (isset($backuppath) && file_exists($backuppath))
 			{
 				require_once $backuppath;
 			}
 			else
 			{
-				throw new \InvalidArgumentException(Text::sprintf('JLIB_APPLICATION_ERROR_INVALID_CONTROLLER', $type, $format));
+				throw new \InvalidArgumentException(\JText::sprintf('JLIB_APPLICATION_ERROR_INVALID_CONTROLLER', $type, $format));
 			}
 		}
 
 		// Instantiate the class.
 		if (!class_exists($class))
 		{
-			throw new \InvalidArgumentException(Text::sprintf('JLIB_APPLICATION_ERROR_INVALID_CONTROLLER_CLASS', $class));
+			throw new \InvalidArgumentException(\JText::sprintf('JLIB_APPLICATION_ERROR_INVALID_CONTROLLER_CLASS', $class));
 		}
 
-		// Check for a possible service from the container otherwise manually instantiate the class
-		if (Factory::getContainer()->has($class))
-		{
-			self::$instance = Factory::getContainer()->get($class);
-		}
-		else
-		{
-			self::$instance = new $class($config, null, $app, $input);
-		}
-
-		return self::$instance;
+		// Instantiate the class, store it to the static container, and return it
+		return self::$instance = new $class($config);
 	}
 
 	/**
 	 * Constructor.
 	 *
 	 * @param   array                $config   An optional associative array of configuration settings.
-	 *                                         Recognized key values include 'name', 'default_task', 'model_path', and
-	 *                                         'view_path' (this list is not meant to be comprehensive).
+	 * Recognized key values include 'name', 'default_task', 'model_path', and
+	 * 'view_path' (this list is not meant to be comprehensive).
 	 * @param   MVCFactoryInterface  $factory  The factory.
-	 * @param   CMSApplication       $app      The Application for the dispatcher
-	 * @param   Input                $input    Input
 	 *
 	 * @since   3.0
 	 */
-	public function __construct($config = array(), MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null)
+	public function __construct($config = array(), MVCFactoryInterface $factory = null)
 	{
 		$this->methods = array();
 		$this->message = null;
@@ -380,16 +332,15 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		$this->redirect = null;
 		$this->taskMap = array();
 
-		$this->app   = $app ?: Factory::getApplication();
-		$this->input = $input ?: $this->app->input;
-
-		if (\defined('JDEBUG') && JDEBUG)
+		if (defined('JDEBUG') && JDEBUG)
 		{
-			Log::addLogger(array('text_file' => 'jcontroller.log.php'), Log::ALL, array('controller'));
+			\JLog::addLogger(array('text_file' => 'jcontroller.log.php'), \JLog::ALL, array('controller'));
 		}
 
+		$this->input = \JFactory::getApplication()->input;
+
 		// Determine the methods to exclude from the base class.
-		$xMethods = get_class_methods('\\Joomla\\CMS\\MVC\\Controller\\BaseController');
+		$xMethods = get_class_methods('\JControllerLegacy');
 
 		// Get the public methods in this class using reflection.
 		$r = new \ReflectionClass($this);
@@ -400,7 +351,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 			$mName = $rMethod->getName();
 
 			// Add default display method if not explicitly declared.
-			if ($mName === 'display' || !\in_array($mName, $xMethods))
+			if ($mName === 'display' || !in_array($mName, $xMethods))
 			{
 				$this->methods[] = strtolower($mName);
 
@@ -412,7 +363,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		// Set the view name
 		if (empty($this->name))
 		{
-			if (\array_key_exists('name', $config))
+			if (array_key_exists('name', $config))
 			{
 				$this->name = $config['name'];
 			}
@@ -423,7 +374,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 
 		// Set a base path for use by the controller
-		if (\array_key_exists('base_path', $config))
+		if (array_key_exists('base_path', $config))
 		{
 			$this->basePath = $config['base_path'];
 		}
@@ -433,7 +384,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 
 		// If the default task is set, register it as such
-		if (\array_key_exists('default_task', $config))
+		if (array_key_exists('default_task', $config))
 		{
 			$this->registerDefaultTask($config['default_task']);
 		}
@@ -445,7 +396,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		// Set the models prefix
 		if (empty($this->model_prefix))
 		{
-			if (\array_key_exists('model_prefix', $config))
+			if (array_key_exists('model_prefix', $config))
 			{
 				// User-defined prefix
 				$this->model_prefix = $config['model_prefix'];
@@ -457,7 +408,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 
 		// Set the default model search path
-		if (\array_key_exists('model_path', $config))
+		if (array_key_exists('model_path', $config))
 		{
 			// User-defined dirs
 			$this->addModelPath($config['model_path'], $this->model_prefix);
@@ -468,7 +419,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 
 		// Set the default view search path
-		if (\array_key_exists('view_path', $config))
+		if (array_key_exists('view_path', $config))
 		{
 			// User-defined dirs
 			$this->setPath('view', $config['view_path']);
@@ -479,7 +430,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 
 		// Set the default view.
-		if (\array_key_exists('default_view', $config))
+		if (array_key_exists('default_view', $config))
 		{
 			$this->default_view = $config['default_view'];
 		}
@@ -497,7 +448,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $type  The path type (e.g. 'model', 'view').
 	 * @param   mixed   $path  The directory string  or stream array to search.
 	 *
-	 * @return  static  A \JControllerLegacy object to support chaining.
+	 * @return  \JControllerLegacy  A \JControllerLegacy object to support chaining.
 	 *
 	 * @since   3.0
 	 */
@@ -512,7 +463,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		foreach ((array) $path as $dir)
 		{
 			// No surrounding spaces allowed!
-			$dir = rtrim(Path::check($dir), '/') . '/';
+			$dir = rtrim(\JPath::check($dir), '/') . '/';
 
 			// Add to the top of the search dirs
 			array_unshift($this->paths[$type], $dir);
@@ -526,13 +477,30 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 *
 	 * @param   mixed  $path  The directory (string) or list of directories (array) to add.
 	 *
-	 * @return  static  This object to support chaining.
+	 * @return  \JControllerLegacy  This object to support chaining.
 	 *
 	 * @since   3.0
 	 */
 	public function addViewPath($path)
 	{
 		return $this->addPath('view', $path);
+	}
+
+	/**
+	 * Authorisation check
+	 *
+	 * @param   string  $task  The ACO Section Value to check access on.
+	 *
+	 * @return  boolean  True if authorised
+	 *
+	 * @since   3.0
+	 * @deprecated  3.0  Use \JAccess instead.
+	 */
+	public function authorise($task)
+	{
+		\JLog::add(__METHOD__ . ' is deprecated. Use \JAccess instead.', \JLog::WARNING, 'deprecated');
+
+		return true;
 	}
 
 	/**
@@ -549,13 +517,13 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	{
 		if ($id)
 		{
-			$values = (array) $this->app->getUserState($context . '.id');
+			$values = (array) \JFactory::getApplication()->getUserState($context . '.id');
 
-			$result = \in_array((int) $id, $values);
+			$result = in_array((int) $id, $values);
 
-			if (\defined('JDEBUG') && JDEBUG)
+			if (defined('JDEBUG') && JDEBUG)
 			{
-				$this->app->getLogger()->info(
+				\JLog::add(
 					sprintf(
 						'Checking edit ID %s.%s: %d %s',
 						$context,
@@ -563,7 +531,8 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 						(int) $result,
 						str_replace("\n", ' ', print_r($values, 1))
 					),
-					array('category' => 'controller')
+					\JLog::INFO,
+					'controller'
 				);
 			}
 
@@ -581,7 +550,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $prefix  Optional model prefix.
 	 * @param   array   $config  Configuration array for the model. Optional.
 	 *
-	 * @return  BaseDatabaseModel|boolean   Model object on success; otherwise false on failure.
+	 * @return  \JModelLegacy|boolean   Model object on success; otherwise false on failure.
 	 *
 	 * @since   3.0
 	 */
@@ -610,7 +579,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $type    The type of view.
 	 * @param   array   $config  Configuration array for the view. Optional.
 	 *
-	 * @return  ViewInterface|null  View object on success; null or error result on failure.
+	 * @return  \JViewLegacy|null  View object on success; null or error result on failure.
 	 *
 	 * @since   3.0
 	 * @throws  \Exception
@@ -618,7 +587,6 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	protected function createView($name, $prefix = '', $type = '', $config = array())
 	{
 		$config['paths'] = $this->paths['view'];
-
 		return $this->factory->createView($name, $prefix, $type, $config);
 	}
 
@@ -629,16 +597,15 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * you will need to override it in your own controllers.
 	 *
 	 * @param   boolean  $cachable   If true, the view output will be cached
-	 * @param   array    $urlparams  An array of safe url parameters and their variable types, for valid values see {@link InputFilter::clean()}.
+	 * @param   array    $urlparams  An array of safe URL parameters and their variable types, for valid values see {@link \JFilterInput::clean()}.
 	 *
-	 * @return  static  A \JControllerLegacy object to support chaining.
+	 * @return  \JControllerLegacy  A \JControllerLegacy object to support chaining.
 	 *
 	 * @since   3.0
-	 * @throws  \Exception
 	 */
 	public function display($cachable = false, $urlparams = array())
 	{
-		$document = $this->app->getDocument();
+		$document = \JFactory::getDocument();
 		$viewType = $document->getType();
 		$viewName = $this->input->get('view', $this->default_view);
 		$viewLayout = $this->input->get('layout', 'default', 'string');
@@ -646,7 +613,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		$view = $this->getView($viewName, $viewType, '', array('base_path' => $this->basePath, 'layout' => $viewLayout));
 
 		// Get/Create the model
-		if ($model = $this->getModel($viewName, '', array('base_path' => $this->basePath)))
+		if ($model = $this->getModel($viewName))
 		{
 			// Push the model into the view (as default)
 			$view->setModel($model, true);
@@ -655,17 +622,17 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		$view->document = $document;
 
 		// Display the view
-		if ($cachable && $viewType !== 'feed' && Factory::getApplication()->get('caching') >= 1)
+		if ($cachable && $viewType !== 'feed' && \JFactory::getConfig()->get('caching') >= 1)
 		{
 			$option = $this->input->get('option');
 
-			if (\is_array($urlparams))
+			if (is_array($urlparams))
 			{
-				$this->app = Factory::getApplication();
+				$app = \JFactory::getApplication();
 
-				if (!empty($this->app->registeredurlparams))
+				if (!empty($app->registeredurlparams))
 				{
-					$registeredurlparams = $this->app->registeredurlparams;
+					$registeredurlparams = $app->registeredurlparams;
 				}
 				else
 				{
@@ -674,20 +641,20 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 
 				foreach ($urlparams as $key => $value)
 				{
-					// Add your safe URL parameters with variable type as value {@see InputFilter::clean()}.
+					// Add your safe URL parameters with variable type as value {@see \JFilterInput::clean()}.
 					$registeredurlparams->$key = $value;
 				}
 
-				$this->app->registeredurlparams = $registeredurlparams;
+				$app->registeredurlparams = $registeredurlparams;
 			}
 
 			try
 			{
-				/** @var \Joomla\CMS\Cache\Controller\ViewController $cache */
-				$cache = Factory::getCache($option, 'view');
+				/** @var \JCacheControllerView $cache */
+				$cache = \JFactory::getCache($option, 'view');
 				$cache->get($view, 'display');
 			}
-			catch (CacheExceptionInterface $exception)
+			catch (\JCacheException $exception)
 			{
 				$view->display();
 			}
@@ -726,7 +693,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		}
 		else
 		{
-			throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_TASK_NOT_FOUND', $task), 404);
+			throw new \Exception(\JText::sprintf('JLIB_APPLICATION_ERROR_TASK_NOT_FOUND', $task), 404);
 		}
 
 		// Record the actual task being fired
@@ -742,7 +709,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $prefix  The class prefix. Optional.
 	 * @param   array   $config  Configuration array for model. Optional.
 	 *
-	 * @return  BaseDatabaseModel|boolean  Model object on success; otherwise false on failure.
+	 * @return  \JModelLegacy|boolean  Model object on success; otherwise false on failure.
 	 *
 	 * @since   3.0
 	 */
@@ -753,21 +720,9 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 			$name = $this->getName();
 		}
 
-		if (!$prefix)
+		if (empty($prefix))
 		{
-			if ($this->factory instanceof LegacyFactory)
-			{
-				$prefix = $this->model_prefix;
-			}
-			// When the frontend uses an administrator model
-			elseif (!empty($config['base_path']) && strpos(Path::clean($config['base_path']), JPATH_ADMINISTRATOR) === 0)
-			{
-				$prefix = 'Administrator';
-			}
-			else
-			{
-				$prefix = $this->app->getName();
-			}
+			$prefix = $this->model_prefix;
 		}
 
 		if ($model = $this->createModel($name, $prefix, $config))
@@ -775,17 +730,10 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 			// Task is a reserved state
 			$model->setState('task', $this->task);
 
-			// We don't have the concept on a menu tree in the api app, so skip setting it's information and
-			// return early
-			if ($this->app->isClient('api'))
-			{
-				return $model;
-			}
-
 			// Let's get the application object and set menu information if it's available
-			$menu = Factory::getApplication()->getMenu();
+			$menu = \JFactory::getApplication()->getMenu();
 
-			if (\is_object($menu) && $item = $menu->getActive())
+			if (is_object($menu) && $item = $menu->getActive())
 			{
 				$params = $menu->getParams($item->id);
 
@@ -814,9 +762,9 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 		{
 			$r = null;
 
-			if (!preg_match('/(.*)Controller/i', \get_class($this), $r))
+			if (!preg_match('/(.*)Controller/i', get_class($this), $r))
 			{
-				throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_GET_NAME', __METHOD__), 500);
+				throw new \Exception(\JText::_('JLIB_APPLICATION_ERROR_CONTROLLER_GET_NAME'), 500);
 			}
 
 			$this->name = strtolower($r[1]);
@@ -857,7 +805,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $prefix  The class prefix. Optional.
 	 * @param   array   $config  Configuration array for view. Optional.
 	 *
-	 * @return  ViewInterface  Reference to the view or an error.
+	 * @return  \JViewLegacy  Reference to the view or an error.
 	 *
 	 * @since   3.0
 	 * @throws  \Exception
@@ -875,21 +823,9 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 			$name = $this->getName();
 		}
 
-		if (!$prefix)
+		if (empty($prefix))
 		{
-			if ($this->factory instanceof LegacyFactory)
-			{
-				$prefix = $this->getName() . 'View';
-			}
-			// When the front uses an administrator view
-			elseif (!empty($config['base_path']) && strpos(Path::clean($config['base_path']), JPATH_ADMINISTRATOR) === 0)
-			{
-				$prefix = 'Administrator';
-			}
-			else
-			{
-				$prefix = $this->app->getName();
-			}
+			$prefix = $this->getName() . 'View';
 		}
 
 		if (empty(self::$views[$name][$type][$prefix]))
@@ -900,7 +836,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 			}
 			else
 			{
-				throw new \Exception(Text::sprintf('JLIB_APPLICATION_ERROR_VIEW_NOT_FOUND', $name, $type, $prefix), 404);
+				throw new \Exception(\JText::sprintf('JLIB_APPLICATION_ERROR_VIEW_NOT_FOUND', $name, $type, $prefix), 404);
 			}
 		}
 
@@ -919,25 +855,27 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 */
 	protected function holdEditId($context, $id)
 	{
-		$values = (array) $this->app->getUserState($context . '.id');
+		$app = \JFactory::getApplication();
+		$values = (array) $app->getUserState($context . '.id');
 
 		// Add the id to the list if non-zero.
 		if (!empty($id))
 		{
 			$values[] = (int) $id;
 			$values   = array_unique($values);
-			$this->app->setUserState($context . '.id', $values);
+			$app->setUserState($context . '.id', $values);
 
-			if (\defined('JDEBUG') && JDEBUG)
+			if (defined('JDEBUG') && JDEBUG)
 			{
-				$this->app->getLogger()->info(
+				\JLog::add(
 					sprintf(
 						'Holding edit ID %s.%s %s',
 						$context,
 						$id,
 						str_replace("\n", ' ', print_r($values, 1))
 					),
-					array('category' => 'controller')
+					\JLog::INFO,
+					'controller'
 				);
 			}
 		}
@@ -954,11 +892,13 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	{
 		if ($this->redirect)
 		{
+			$app = \JFactory::getApplication();
+
 			// Enqueue the redirect message
-			$this->app->enqueueMessage($this->message, $this->messageType);
+			$app->enqueueMessage($this->message, $this->messageType);
 
 			// Execute the redirect
-			$this->app->redirect($this->redirect);
+			$app->redirect($this->redirect);
 		}
 
 		return false;
@@ -969,7 +909,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 *
 	 * @param   string  $method  The name of the method in the derived class to perform if a named task is not found.
 	 *
-	 * @return  static  A \JControllerLegacy object to support chaining.
+	 * @return  \JControllerLegacy  A \JControllerLegacy object to support chaining.
 	 *
 	 * @since   3.0
 	 */
@@ -986,13 +926,13 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $task    The task.
 	 * @param   string  $method  The name of the method in the derived class to perform for this task.
 	 *
-	 * @return  static  A \JControllerLegacy object to support chaining.
+	 * @return  \JControllerLegacy  A \JControllerLegacy object to support chaining.
 	 *
 	 * @since   3.0
 	 */
 	public function registerTask($task, $method)
 	{
-		if (\in_array(strtolower($method), $this->methods))
+		if (in_array(strtolower($method), $this->methods))
 		{
 			$this->taskMap[strtolower($task)] = $method;
 		}
@@ -1005,7 +945,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 *
 	 * @param   string  $task  The task.
 	 *
-	 * @return  static  This object to support chaining.
+	 * @return  \JControllerLegacy  This object to support chaining.
 	 *
 	 * @since   3.0
 	 */
@@ -1028,26 +968,28 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 */
 	protected function releaseEditId($context, $id)
 	{
-		$values = (array) $this->app->getUserState($context . '.id');
+		$app = \JFactory::getApplication();
+		$values = (array) $app->getUserState($context . '.id');
 
 		// Do a strict search of the edit list values.
 		$index = array_search((int) $id, $values, true);
 
-		if (\is_int($index))
+		if (is_int($index))
 		{
 			unset($values[$index]);
-			$this->app->setUserState($context . '.id', $values);
+			$app->setUserState($context . '.id', $values);
 
-			if (\defined('JDEBUG') && JDEBUG)
+			if (defined('JDEBUG') && JDEBUG)
 			{
-				$this->app->getLogger()->info(
+				\JLog::add(
 					sprintf(
 						'Releasing edit ID %s.%s %s',
 						$context,
 						$id,
 						str_replace("\n", ' ', print_r($values, 1))
 					),
-					array('category' => 'controller')
+					\JLog::INFO,
+					'controller'
 				);
 			}
 		}
@@ -1094,7 +1036,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	/**
 	 * Checks for a form token in the request.
 	 *
-	 * Use in conjunction with HTMLHelper::_('form.token') or Session::getFormToken.
+	 * Use in conjunction with \JHtml::_('form.token') or \JSession::getFormToken.
 	 *
 	 * @param   string   $method    The request method in which to look for the token key.
 	 * @param   boolean  $redirect  Whether to implicitly redirect user to the referrer page on failure or simply return false.
@@ -1102,23 +1044,24 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @return  boolean  True if found and valid, otherwise return false or redirect to referrer page.
 	 *
 	 * @since   3.7.0
-	 * @see     Session::checkToken()
+	 * @see     \JSession::checkToken()
 	 */
 	public function checkToken($method = 'post', $redirect = true)
 	{
-		$valid = Session::checkToken($method);
+		$valid = \JSession::checkToken($method);
 
 		if (!$valid && $redirect)
 		{
 			$referrer = $this->input->server->getString('HTTP_REFERER');
 
-			if (!Uri::isInternal($referrer))
+			if (!\JUri::isInternal($referrer))
 			{
 				$referrer = 'index.php';
 			}
 
-			$this->app->enqueueMessage(Text::_('JINVALID_TOKEN_NOTICE'), 'warning');
-			$this->app->redirect($referrer);
+			$app = \JFactory::getApplication();
+			$app->enqueueMessage(\JText::_('JINVALID_TOKEN_NOTICE'), 'warning');
+			$app->redirect($referrer);
 		}
 
 		return $valid;
@@ -1131,7 +1074,7 @@ class BaseController implements ControllerInterface, DispatcherAwareInterface
 	 * @param   string  $msg   Message to display on redirect. Optional, defaults to value set internally by controller, if any.
 	 * @param   string  $type  Message type. Optional, defaults to 'message' or the type set by a previous call to setMessage.
 	 *
-	 * @return  static  This object to support chaining.
+	 * @return  \JControllerLegacy  This object to support chaining.
 	 *
 	 * @since   3.0
 	 */

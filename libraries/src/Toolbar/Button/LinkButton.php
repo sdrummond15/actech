@@ -8,46 +8,23 @@
 
 namespace Joomla\CMS\Toolbar\Button;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Layout\FileLayout;
 use Joomla\CMS\Toolbar\ToolbarButton;
 
 /**
  * Renders a link button
- *
- * @method self    url(string $value)
- * @method self    target(string $value)
- * @method string  getUrl()
- * @method string  getTarget()
  *
  * @since  3.0
  */
 class LinkButton extends ToolbarButton
 {
 	/**
-	 * Property layout.
-	 *
-	 * @var  string
-	 *
-	 * @since  4.0.0
+	 * Button type
+	 * @var    string
 	 */
-	protected $layout = 'joomla.toolbar.link';
-
-	/**
-	 * Prepare options for this button.
-	 *
-	 * @param   array  $options  The options about this button.
-	 *
-	 * @return  void
-	 *
-	 * @since  4.0.0
-	 */
-	protected function prepareOptions(array &$options)
-	{
-		parent::prepareOptions($options);
-
-		unset($options['attributes']['type']);
-	}
+	protected $_name = 'Link';
 
 	/**
 	 * Fetch the HTML for the button
@@ -60,33 +37,47 @@ class LinkButton extends ToolbarButton
 	 * @return  string  HTML string for the button
 	 *
 	 * @since   3.0
-	 *
-	 * @deprecated  5.0 Use render() instead.
 	 */
 	public function fetchButton($type = 'Link', $name = 'back', $text = '', $url = null)
 	{
-		$this->name($name)
-			->text($text)
-			->url($url);
+		// Store all data to the options array for use with JLayout
+		$options = array();
+		$options['text'] = \JText::_($text);
+		$options['class'] = $this->fetchIconClass($name);
+		$options['doTask'] = $this->_getCommand($url);
 
-		return $this->renderButton($this->options);
+		// Instantiate a new JLayoutFile instance and render the layout
+		$layout = new FileLayout('joomla.toolbar.link');
+
+		return $layout->render($options);
 	}
 
 	/**
-	 * Method to configure available option accessors.
+	 * Get the button CSS Id
 	 *
-	 * @return  array
+	 * @param   string  $type  The button type.
+	 * @param   string  $name  The name of the button.
 	 *
-	 * @since  4.0.0
+	 * @return  string  Button CSS Id
+	 *
+	 * @since   3.0
 	 */
-	protected static function getAccessors(): array
+	public function fetchId($type = 'Link', $name = '')
 	{
-		return array_merge(
-			parent::getAccessors(),
-			[
-				'url',
-				'target'
-			]
-		);
+		return $this->_parent->getName() . '-' . $name;
+	}
+
+	/**
+	 * Get the JavaScript command for the button
+	 *
+	 * @param   object  $url  Button definition
+	 *
+	 * @return  string  JavaScript command string
+	 *
+	 * @since   3.0
+	 */
+	protected function _getCommand($url)
+	{
+		return $url;
 	}
 }

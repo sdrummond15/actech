@@ -9,20 +9,23 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Factory;
 use Joomla\CMS\Helper\ModuleHelper;
-use Joomla\Module\LatestActions\Administrator\Helper\LatestActionsHelper;
 
 // Only super user can view this data
-if (!$app->getIdentity()->authorise('core.admin'))
+if (!Factory::getUser()->authorise('core.admin'))
 {
 	return;
 }
 
-$list = LatestActionsHelper::getList($params);
+// Include dependencies.
+JLoader::register('ModLatestActionsHelper', __DIR__ . '/helper.php');
+
+$list = ModLatestActionsHelper::getList($params);
 
 if ($params->get('automatic_title', 0))
 {
-	$module->title = LatestActionsHelper::getTitle($params);
+	$module->title = ModLatestActionsHelper::getTitle($params);
 }
 
 require ModuleHelper::getLayoutPath('mod_latestactions', $params->get('layout', 'default'));

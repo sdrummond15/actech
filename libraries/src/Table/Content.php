@@ -8,49 +8,38 @@
 
 namespace Joomla\CMS\Table;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
+use Joomla\CMS\Access\Access;
 use Joomla\CMS\Access\Rules;
 use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Tag\TaggableTableInterface;
-use Joomla\CMS\Tag\TaggableTableTrait;
-use Joomla\CMS\Versioning\VersionableTableInterface;
-use Joomla\Database\DatabaseDriver;
-use Joomla\Database\ParameterType;
+use Joomla\CMS\Table\Observer\Tags;
+use Joomla\CMS\Table\Observer\ContentHistory as ContentHistoryObserver;
 use Joomla\Registry\Registry;
 use Joomla\String\StringHelper;
 
 /**
  * Content table
  *
- * @since  1.5
+ * @since       1.5
+ * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
  */
-class Content extends Table implements VersionableTableInterface, TaggableTableInterface
+class Content extends Table
 {
-	use TaggableTableTrait;
-
-	/**
-	 * Indicates that columns fully support the NULL value in the database
-	 *
-	 * @var    boolean
-	 * @since  4.0.0
-	 */
-	protected $_supportNullValue = true;
-
 	/**
 	 * Constructor
 	 *
-	 * @param   DatabaseDriver  $db  A database connector object
+	 * @param   \JDatabaseDriver  $db  A database connector object
 	 *
 	 * @since   1.5
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
-	public function __construct(DatabaseDriver $db)
+	public function __construct(\JDatabaseDriver $db)
 	{
-		$this->typeAlias = 'com_content.article';
-
 		parent::__construct('#__content', 'id', $db);
+
+		Tags::createObserver($this, array('typeAlias' => 'com_content.article'));
+		ContentHistoryObserver::createObserver($this, array('typeAlias' => 'com_content.article'));
 
 		// Set the alias since the column is called state
 		$this->setColumnAlias('published', 'state');
@@ -64,6 +53,7 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 * @return  string
 	 *
 	 * @since   1.6
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
 	protected function _getAssetName()
 	{
@@ -78,6 +68,7 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 * @return  string
 	 *
 	 * @since   1.6
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
 	protected function _getAssetTitle()
 	{
@@ -93,6 +84,7 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 * @return  integer
 	 *
 	 * @since   1.6
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
 	protected function _getAssetParentId(Table $table = null, $id = null)
 	{
@@ -101,14 +93,11 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 		// This is an article under a category.
 		if ($this->catid)
 		{
-			$catId = (int) $this->catid;
-
 			// Build the query to get the asset id for the parent category.
 			$query = $this->_db->getQuery(true)
 				->select($this->_db->quoteName('asset_id'))
 				->from($this->_db->quoteName('#__categories'))
-				->where($this->_db->quoteName('id') . ' = :catid')
-				->bind(':catid', $catId, ParameterType::INTEGER);
+				->where($this->_db->quoteName('id') . ' = ' . (int) $this->catid);
 
 			// Get the asset id from the database.
 			$this->_db->setQuery($query);
@@ -141,6 +130,7 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 *
 	 * @see     Table::bind()
 	 * @since   1.6
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
 	public function bind($array, $ignore = '')
 	{
@@ -161,20 +151,20 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 			}
 		}
 
-		if (isset($array['attribs']) && \is_array($array['attribs']))
+		if (isset($array['attribs']) && is_array($array['attribs']))
 		{
 			$registry = new Registry($array['attribs']);
 			$array['attribs'] = (string) $registry;
 		}
 
-		if (isset($array['metadata']) && \is_array($array['metadata']))
+		if (isset($array['metadata']) && is_array($array['metadata']))
 		{
 			$registry = new Registry($array['metadata']);
 			$array['metadata'] = (string) $registry;
 		}
 
 		// Bind the rules.
-		if (isset($array['rules']) && \is_array($array['rules']))
+		if (isset($array['rules']) && is_array($array['rules']))
 		{
 			$rules = new Rules($array['rules']);
 			$this->setRules($rules);
@@ -190,23 +180,13 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 *
 	 * @see     Table::check()
 	 * @since   1.5
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
 	public function check()
 	{
-		try
-		{
-			parent::check();
-		}
-		catch (\Exception $e)
-		{
-			$this->setError($e->getMessage());
-
-			return false;
-		}
-
 		if (trim($this->title) == '')
 		{
-			$this->setError(Text::_('COM_CONTENT_WARNING_PROVIDE_VALID_NAME'));
+			$this->setError(\JText::_('COM_CONTENT_WARNING_PROVIDE_VALID_NAME'));
 
 			return false;
 		}
@@ -220,15 +200,7 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 
 		if (trim(str_replace('-', '', $this->alias)) == '')
 		{
-			$this->alias = Factory::getDate()->format('Y-m-d-H-i-s');
-		}
-
-		// Check for a valid category.
-		if (!$this->catid = (int) $this->catid)
-		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_CATEGORY_REQUIRED'));
-
-			return false;
+			$this->alias = \JFactory::getDate()->format('Y-m-d-H-i-s');
 		}
 
 		if (trim(str_replace('&nbsp;', '', $this->fulltext)) == '')
@@ -265,25 +237,10 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 			{
 				$this->metadata = '{}';
 			}
-
-			// Hits must be zero on a new item
-			$this->hits = 0;
-		}
-
-		// Set publish_up to null if not set
-		if (!$this->publish_up)
-		{
-			$this->publish_up = null;
-		}
-
-		// Set publish_down to null if not set
-		if (!$this->publish_down)
-		{
-			$this->publish_down = null;
 		}
 
 		// Check the publish down date is not earlier than publish up.
-		if (!is_null($this->publish_up) && !is_null($this->publish_down) && $this->publish_down < $this->publish_up)
+		if ($this->publish_down < $this->publish_up && $this->publish_down > $this->_db->getNullDate())
 		{
 			// Swap the dates.
 			$temp = $this->publish_up;
@@ -298,39 +255,54 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 			// Only process if not empty
 
 			// Array of characters to remove
-			$badCharacters = ["\n", "\r", "\"", '<', '>'];
+			$bad_characters = array("\n", "\r", "\"", '<', '>');
 
 			// Remove bad characters
-			$afterClean = StringHelper::str_ireplace($badCharacters, '', $this->metakey);
+			$after_clean = StringHelper::str_ireplace($bad_characters, '', $this->metakey);
 
 			// Create array using commas as delimiter
-			$keys = explode(',', $afterClean);
+			$keys = explode(',', $after_clean);
 
-			$cleanKeys = [];
+			$clean_keys = array();
 
 			foreach ($keys as $key)
 			{
 				if (trim($key))
 				{
 					// Ignore blank keywords
-					$cleanKeys[] = trim($key);
+					$clean_keys[] = trim($key);
 				}
 			}
 
 			// Put array back together delimited by ", "
-			$this->metakey = implode(', ', $cleanKeys);
-		}
-		else
-		{
-			$this->metakey = '';
-		}
-
-		if ($this->metadesc === null)
-		{
-			$this->metadesc = '';
+			$this->metakey = implode(', ', $clean_keys);
 		}
 
 		return true;
+	}
+
+	/**
+	 * Gets the default asset values for a component.
+	 *
+	 * @param   string  $component  The component asset name to search for
+	 *
+	 * @return  Rules  The Rules object for the asset
+	 *
+	 * @since   3.4
+	 * @deprecated  3.4 Class will be removed upon completion of transition to UCM
+	 */
+	protected function getDefaultAssetValues($component)
+	{
+		// Need to find the asset id by the name of the component.
+		$db = $this->getDbo();
+		$query = $db->getQuery(true)
+			->select($db->quoteName('id'))
+			->from($db->quoteName('#__assets'))
+			->where($db->quoteName('name') . ' = ' . $db->quote($component));
+		$db->setQuery($query);
+		$assetId = (int) $db->loadResult();
+
+		return Access::getAssetRules($assetId);
 	}
 
 	/**
@@ -341,42 +313,32 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 	 * @return  boolean  True on success.
 	 *
 	 * @since   1.6
+	 * @deprecated  3.1.4 Class will be removed upon completion of transition to UCM
 	 */
-	public function store($updateNulls = true)
+	public function store($updateNulls = false)
 	{
-		$date = Factory::getDate()->toSql();
-		$user = Factory::getUser();
+		$date = \JFactory::getDate();
+		$user = \JFactory::getUser();
 
-		// Set created date if not set.
-		if (!(int) $this->created)
-		{
-			$this->created = $date;
-		}
+		$this->modified = $date->toSql();
 
 		if ($this->id)
 		{
 			// Existing item
 			$this->modified_by = $user->get('id');
-			$this->modified    = $date;
 		}
 		else
 		{
-			// Field created_by can be set by the user, so we don't touch it if it's set.
+			// New article. An article created and created_by field can be set by the user,
+			// so we don't touch either of these if they are set.
+			if (!(int) $this->created)
+			{
+				$this->created = $date->toSql();
+			}
+
 			if (empty($this->created_by))
 			{
 				$this->created_by = $user->get('id');
-			}
-
-			// Set modified to created date if not set
-			if (!(int) $this->modified)
-			{
-				$this->modified = $this->created;
-			}
-
-			// Set modified_by to created_by user if not set
-			if (empty($this->modified_by))
-			{
-				$this->modified_by = $this->created_by;
 			}
 		}
 
@@ -385,23 +347,11 @@ class Content extends Table implements VersionableTableInterface, TaggableTableI
 
 		if ($table->load(array('alias' => $this->alias, 'catid' => $this->catid)) && ($table->id != $this->id || $this->id == 0))
 		{
-			$this->setError(Text::_('JLIB_DATABASE_ERROR_ARTICLE_UNIQUE_ALIAS'));
+			$this->setError(\JText::_('JLIB_DATABASE_ERROR_ARTICLE_UNIQUE_ALIAS'));
 
 			return false;
 		}
 
 		return parent::store($updateNulls);
-	}
-
-	/**
-	 * Get the type alias for UCM features
-	 *
-	 * @return  string  The alias as described above
-	 *
-	 * @since   4.0.0
-	 */
-	public function getTypeAlias()
-	{
-		return $this->typeAlias;
 	}
 }

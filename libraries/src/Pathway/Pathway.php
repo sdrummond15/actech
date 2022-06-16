@@ -8,10 +8,9 @@
 
 namespace Joomla\CMS\Pathway;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
+use Joomla\CMS\Application\ApplicationHelper;
 
 /**
  * Class to maintain a pathway.
@@ -23,23 +22,21 @@ use Joomla\CMS\Language\Text;
 class Pathway
 {
 	/**
-	 * Array to hold the pathway item objects
-	 *
-	 * @var    array
-	 * @since  4.0.0
+	 * @var    array  Array to hold the pathway item objects
+	 * @since  1.5
+	 * @deprecated  4.0  Will convert to $pathway
 	 */
-	protected $pathway = array();
+	protected $_pathway = array();
 
 	/**
-	 * Integer number of items in the pathway
-	 *
-	 * @var    integer
-	 * @since  4.0.0
+	 * @var    integer  Integer number of items in the pathway
+	 * @since  1.5
+	 * @deprecated  4.0  Will convert to $count
 	 */
-	protected $count = 0;
+	protected $_count = 0;
 
 	/**
-	 * Pathway instances container.
+	 * JPathway instances container.
 	 *
 	 * @var    Pathway[]
 	 * @since  1.7
@@ -47,29 +44,61 @@ class Pathway
 	protected static $instances = array();
 
 	/**
+	 * Class constructor
+	 *
+	 * @param   array  $options  The class options.
+	 *
+	 * @since   1.5
+	 */
+	public function __construct($options = array())
+	{
+	}
+
+	/**
 	 * Returns a Pathway object
 	 *
-	 * @param   string  $client  The name of the client
+	 * @param   string  $client   The name of the client
+	 * @param   array   $options  An associative array of options
 	 *
 	 * @return  Pathway  A Pathway object.
 	 *
-	 * @since       1.5
-	 * @throws      \RuntimeException
-	 * @deprecated  5.0 Get the instance from the application, eg. $application->getPathway()
+	 * @since   1.5
+	 * @throws  \RuntimeException
 	 */
-	public static function getInstance($client)
+	public static function getInstance($client, $options = array())
 	{
 		if (empty(self::$instances[$client]))
 		{
 			// Create a Pathway object
-			$name = ucfirst($client) . 'Pathway';
+			$classname = 'JPathway' . ucfirst($client);
 
-			if (!Factory::getContainer()->has($name))
+			if (!class_exists($classname))
 			{
-				throw new \RuntimeException(Text::sprintf('JLIB_APPLICATION_ERROR_PATHWAY_LOAD', $client), 500);
+				// @deprecated 4.0 Everything in this block is deprecated but the warning is only logged after the file_exists
+				// Load the pathway object
+				$info = ApplicationHelper::getClientInfo($client, true);
+
+				if (is_object($info))
+				{
+					$path = $info->path . '/includes/pathway.php';
+
+					\JLoader::register($classname, $path);
+
+					if (class_exists($classname))
+					{
+						\JLog::add('Non-autoloadable Pathway subclasses are deprecated, support will be removed in 4.0.', \JLog::WARNING, 'deprecated');
+					}
+				}
 			}
 
-			self::$instances[$client] = Factory::getContainer()->get($name);
+			if (class_exists($classname))
+			{
+				self::$instances[$client] = new $classname($options);
+			}
+			else
+			{
+				throw new \RuntimeException(\JText::sprintf('JLIB_APPLICATION_ERROR_PATHWAY_LOAD', $client), 500);
+			}
 		}
 
 		return self::$instances[$client];
@@ -84,8 +113,10 @@ class Pathway
 	 */
 	public function getPathway()
 	{
+		$pw = $this->_pathway;
+
 		// Use array_values to reset the array keys numerically
-		return array_values($this->pathway);
+		return array_values($pw);
 	}
 
 	/**
@@ -99,10 +130,10 @@ class Pathway
 	 */
 	public function setPathway($pathway)
 	{
-		$oldPathway = $this->pathway;
+		$oldPathway = $this->_pathway;
 
 		// Set the new pathway.
-		$this->pathway = array_values((array) $pathway);
+		$this->_pathway = array_values((array) $pathway);
 
 		return array_values($oldPathway);
 	}
@@ -119,7 +150,7 @@ class Pathway
 		$names = array();
 
 		// Build the names array using just the names of each pathway item
-		foreach ($this->pathway as $item)
+		foreach ($this->_pathway as $item)
 		{
 			$names[] = $item->name;
 		}
@@ -142,10 +173,10 @@ class Pathway
 	{
 		$ret = false;
 
-		if ($this->pathway[] = $this->makeItem($name, $link))
+		if ($this->_pathway[] = $this->makeItem($name, $link))
 		{
 			$ret = true;
-			$this->count++;
+			$this->_count++;
 		}
 
 		return $ret;
@@ -165,9 +196,9 @@ class Pathway
 	{
 		$ret = false;
 
-		if (isset($this->pathway[$id]))
+		if (isset($this->_pathway[$id]))
 		{
-			$this->pathway[$id]->name = $name;
+			$this->_pathway[$id]->name = $name;
 			$ret = true;
 		}
 
@@ -180,7 +211,24 @@ class Pathway
 	 * @param   string  $name  Name of the item
 	 * @param   string  $link  Link to the item
 	 *
-	 * @return  \stdClass  Pathway item object
+	 * @return  Pathway  Pathway item object
+	 *
+	 * @since   1.5
+	 * @deprecated  4.0  Use makeItem() instead
+	 * @codeCoverageIgnore
+	 */
+	protected function _makeItem($name, $link)
+	{
+		return $this->makeItem($name, $link);
+	}
+
+	/**
+	 * Create and return a new pathway object.
+	 *
+	 * @param   string  $name  Name of the item
+	 * @param   string  $link  Link to the item
+	 *
+	 * @return  Pathway  Pathway item object
 	 *
 	 * @since   3.1
 	 */

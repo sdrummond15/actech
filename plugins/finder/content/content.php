@@ -9,23 +9,16 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Categories\Categories;
-use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Table\Table;
-use Joomla\Component\Content\Site\Helper\RouteHelper;
-use Joomla\Component\Finder\Administrator\Indexer\Adapter;
-use Joomla\Component\Finder\Administrator\Indexer\Helper;
-use Joomla\Component\Finder\Administrator\Indexer\Indexer;
-use Joomla\Component\Finder\Administrator\Indexer\Result;
-use Joomla\Database\DatabaseQuery;
 use Joomla\Registry\Registry;
+
+JLoader::register('FinderIndexerAdapter', JPATH_ADMINISTRATOR . '/components/com_finder/helpers/indexer/adapter.php');
 
 /**
  * Smart Search adapter for com_content.
  *
  * @since  2.5
  */
-class PlgFinderContent extends Adapter
+class PlgFinderContent extends FinderIndexerAdapter
 {
 	/**
 	 * The plugin identifier.
@@ -76,18 +69,6 @@ class PlgFinderContent extends Adapter
 	protected $autoloadLanguage = true;
 
 	/**
-	 * Method to setup the indexer to be run.
-	 *
-	 * @return  boolean  True on success.
-	 *
-	 * @since   2.5
-	 */
-	protected function setup()
-	{
-		return true;
-	}
-
-	/**
 	 * Method to update the item link information when the item category is
 	 * changed. This is fired when the item category is published or unpublished
 	 * from the list view.
@@ -113,14 +94,14 @@ class PlgFinderContent extends Adapter
 	 * Method to remove the link information for items that have been deleted.
 	 *
 	 * @param   string  $context  The context of the action being performed.
-	 * @param   Table   $table    A Table object containing the record to be deleted
+	 * @param   JTable  $table    A JTable object containing the record to be deleted
 	 *
-	 * @return  void
+	 * @return  boolean  True on success.
 	 *
 	 * @since   2.5
 	 * @throws  Exception on database error.
 	 */
-	public function onFinderAfterDelete($context, $table): void
+	public function onFinderAfterDelete($context, $table)
 	{
 		if ($context === 'com_content.article')
 		{
@@ -132,11 +113,11 @@ class PlgFinderContent extends Adapter
 		}
 		else
 		{
-			return;
+			return true;
 		}
 
 		// Remove item from the index.
-		$this->remove($id);
+		return $this->remove($id);
 	}
 
 	/**
@@ -146,15 +127,15 @@ class PlgFinderContent extends Adapter
 	 * category to which it belongs has changed.
 	 *
 	 * @param   string   $context  The context of the content passed to the plugin.
-	 * @param   Table    $row      A Table object.
+	 * @param   JTable   $row      A JTable object.
 	 * @param   boolean  $isNew    True if the content has just been created.
 	 *
-	 * @return  void
+	 * @return  boolean  True on success.
 	 *
 	 * @since   2.5
 	 * @throws  Exception on database error.
 	 */
-	public function onFinderAfterSave($context, $row, $isNew): void
+	public function onFinderAfterSave($context, $row, $isNew)
 	{
 		// We only want to handle articles here.
 		if ($context === 'com_content.article' || $context === 'com_content.form')
@@ -179,6 +160,8 @@ class PlgFinderContent extends Adapter
 				$this->categoryAccessChange($row);
 			}
 		}
+
+		return true;
 	}
 
 	/**
@@ -186,7 +169,7 @@ class PlgFinderContent extends Adapter
 	 * This event is fired before the data is actually saved.
 	 *
 	 * @param   string   $context  The context of the content passed to the plugin.
-	 * @param   Table    $row      A Table object.
+	 * @param   JTable   $row      A JTable object.
 	 * @param   boolean  $isNew    If the content is just about to be created.
 	 *
 	 * @return  boolean  True on success.
@@ -248,21 +231,22 @@ class PlgFinderContent extends Adapter
 	}
 
 	/**
-	 * Method to index an item. The item must be a Result object.
+	 * Method to index an item. The item must be a FinderIndexerResult object.
 	 *
-	 * @param   Result  $item  The item to index as a Result object.
+	 * @param   FinderIndexerResult  $item    The item to index as a FinderIndexerResult object.
+	 * @param   string               $format  The item format.  Not used.
 	 *
 	 * @return  void
 	 *
 	 * @since   2.5
 	 * @throws  Exception on database error.
 	 */
-	protected function index(Result $item)
+	protected function index(FinderIndexerResult $item, $format = 'html')
 	{
 		$item->setLanguage();
 
 		// Check if the extension is enabled.
-		if (ComponentHelper::isEnabled($this->extension) === false)
+		if (JComponentHelper::isEnabled($this->extension) === false)
 		{
 			return;
 		}
@@ -271,20 +255,19 @@ class PlgFinderContent extends Adapter
 
 		// Initialise the item parameters.
 		$registry = new Registry($item->params);
-		$item->params = clone ComponentHelper::getParams('com_content', true);
+		$item->params = clone JComponentHelper::getParams('com_content', true);
 		$item->params->merge($registry);
 
 		$item->metadata = new Registry($item->metadata);
 
 		// Trigger the onContentPrepare event.
-		$item->summary = Helper::prepareContent($item->summary, $item->params, $item);
-		$item->body    = Helper::prepareContent($item->body, $item->params, $item);
-
-		// Create a URL as identifier to recognise items again.
-		$item->url = $this->getUrl($item->id, $this->extension, $this->layout);
+		$item->summary = FinderIndexerHelper::prepareContent($item->summary, $item->params, $item);
+		$item->body    = FinderIndexerHelper::prepareContent($item->body, $item->params, $item);
 
 		// Build the necessary route and path information.
-		$item->route = RouteHelper::getArticleRoute($item->slug, $item->catid, $item->language);
+		$item->url = $this->getUrl($item->id, $this->extension, $this->layout);
+		$item->route = ContentHelperRoute::getArticleRoute($item->slug, $item->catid, $item->language);
+		$item->path = FinderIndexerHelper::getContentPath($item->route);
 
 		// Get the menu title if it exists.
 		$title = $this->getItemMenuTitle($item->url);
@@ -295,24 +278,15 @@ class PlgFinderContent extends Adapter
 			$item->title = $title;
 		}
 
-		$images = $item->images ? json_decode($item->images) : false;
-
-		// Add the image.
-		if ($images && !empty($images->image_intro))
-		{
-			$item->imageUrl = $images->image_intro;
-			$item->imageAlt = $images->image_intro_alt ?? '';
-		}
-
 		// Add the meta author.
 		$item->metaauthor = $item->metadata->get('author');
 
 		// Add the metadata processing instructions.
-		$item->addInstruction(Indexer::META_CONTEXT, 'metakey');
-		$item->addInstruction(Indexer::META_CONTEXT, 'metadesc');
-		$item->addInstruction(Indexer::META_CONTEXT, 'metaauthor');
-		$item->addInstruction(Indexer::META_CONTEXT, 'author');
-		$item->addInstruction(Indexer::META_CONTEXT, 'created_by_alias');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metakey');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metadesc');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'metaauthor');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'author');
+		$item->addInstruction(FinderIndexer::META_CONTEXT, 'created_by_alias');
 
 		// Translate the state. Articles should only be published if the category is published.
 		$item->state = $this->translateState($item->state, $item->cat_state);
@@ -323,46 +297,52 @@ class PlgFinderContent extends Adapter
 		// Add the author taxonomy data.
 		if (!empty($item->author) || !empty($item->created_by_alias))
 		{
-			$item->addTaxonomy('Author', !empty($item->created_by_alias) ? $item->created_by_alias : $item->author, $item->state);
+			$item->addTaxonomy('Author', !empty($item->created_by_alias) ? $item->created_by_alias : $item->author);
 		}
 
 		// Add the category taxonomy data.
-		$categories = Categories::getInstance('com_content', ['published' => false, 'access' => false]);
-		$category = $categories->get($item->catid);
-
-		// Category does not exist, stop here
-		if (!$category)
-		{
-			return;
-		}
-
-		$item->addNestedTaxonomy('Category', $category, $this->translateState($category->published), $category->access, $category->language);
+		$item->addTaxonomy('Category', $item->category, $item->cat_state, $item->cat_access);
 
 		// Add the language taxonomy data.
 		$item->addTaxonomy('Language', $item->language);
 
 		// Get content extras.
-		Helper::getContentExtras($item);
+		FinderIndexerHelper::getContentExtras($item);
 
 		// Index the item.
 		$this->indexer->index($item);
 	}
 
 	/**
+	 * Method to setup the indexer to be run.
+	 *
+	 * @return  boolean  True on success.
+	 *
+	 * @since   2.5
+	 */
+	protected function setup()
+	{
+		// Load dependent classes.
+		JLoader::register('ContentHelperRoute', JPATH_SITE . '/components/com_content/helpers/route.php');
+
+		return true;
+	}
+
+	/**
 	 * Method to get the SQL query used to retrieve the list of content items.
 	 *
-	 * @param   mixed  $query  A DatabaseQuery object or null.
+	 * @param   mixed  $query  A JDatabaseQuery object or null.
 	 *
-	 * @return  DatabaseQuery  A database object.
+	 * @return  JDatabaseQuery  A database object.
 	 *
 	 * @since   2.5
 	 */
 	protected function getListQuery($query = null)
 	{
-		$db = $this->db;
+		$db = JFactory::getDbo();
 
 		// Check if we can use the supplied SQL query.
-		$query = $query instanceof DatabaseQuery ? $query : $db->getQuery(true)
+		$query = $query instanceof JDatabaseQuery ? $query : $db->getQuery(true)
 			->select('a.id, a.title, a.alias, a.introtext AS summary, a.fulltext AS body')
 			->select('a.images')
 			->select('a.state, a.catid, a.created AS start_date, a.created_by')

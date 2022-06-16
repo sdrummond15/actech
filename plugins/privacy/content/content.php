@@ -9,9 +9,7 @@
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\User\User;
-use Joomla\Component\Privacy\Administrator\Plugin\PrivacyPlugin;
-use Joomla\Component\Privacy\Administrator\Table\RequestTable;
+JLoader::register('PrivacyPlugin', JPATH_ADMINISTRATOR . '/components/com_privacy/helpers/plugin.php');
 
 /**
  * Privacy plugin managing Joomla user content data
@@ -27,14 +25,14 @@ class PlgPrivacyContent extends PrivacyPlugin
 	 *
 	 * - Content custom fields
 	 *
-	 * @param   RequestTable  $request  The request record being processed
-	 * @param   User          $user     The user account associated with this request if available
+	 * @param   PrivacyTableRequest  $request  The request record being processed
+	 * @param   JUser                $user     The user account associated with this request if available
 	 *
-	 * @return  \Joomla\Component\Privacy\Administrator\Export\Domain[]
+	 * @return  PrivacyExportDomain[]
 	 *
 	 * @since   3.9.0
 	 */
-	public function onPrivacyExportRequest(RequestTable $request, User $user = null)
+	public function onPrivacyExportRequest(PrivacyTableRequest $request, JUser $user = null)
 	{
 		if (!$user)
 		{

@@ -8,7 +8,7 @@
 
 namespace Joomla\CMS\Menu;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Menu class.
@@ -17,15 +17,4 @@ namespace Joomla\CMS\Menu;
  */
 class AdministratorMenu extends AbstractMenu
 {
-	/**
-	 * Loads the menu items
-	 *
-	 * @return  array
-	 *
-	 * @since   4.0.0
-	 */
-	public function load()
-	{
-		return array();
-	}
 }

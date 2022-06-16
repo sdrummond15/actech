@@ -8,13 +8,7 @@
 
 namespace Joomla\CMS\Help;
 
-\defined('JPATH_PLATFORM') or die;
-
-use Joomla\CMS\Application\ApplicationHelper;
-use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Language\Text;
-use Joomla\CMS\Version;
+defined('JPATH_PLATFORM') or die;
 
 /**
  * Help system class
@@ -38,11 +32,11 @@ class Help
 	public static function createUrl($ref, $useComponent = false, $override = null, $component = null)
 	{
 		$local = false;
-		$app   = Factory::getApplication();
+		$app   = \JFactory::getApplication();
 
 		if ($component === null)
 		{
-			$component = ApplicationHelper::getComponentName();
+			$component = \JApplicationHelper::getComponentName();
 		}
 
 		//  Determine the location of the help file.  At this stage the URL
@@ -61,7 +55,7 @@ class Help
 			if ($useComponent)
 			{
 				// Look for help URL in component parameters.
-				$params = ComponentHelper::getParams($component);
+				$params = \JComponentHelper::getParams($component);
 				$url    = $params->get('helpURL');
 
 				if ($url == '')
@@ -91,13 +85,13 @@ class Help
 		/*
 		 *  Replace substitution codes in the URL.
 		 */
-		$lang    = Factory::getLanguage();
-		$version = new Version;
+		$lang    = \JFactory::getLanguage();
+		$version = new \JVersion;
 		$jver    = explode('.', $version->getShortVersion());
 		$jlang   = explode('-', $lang->getTag());
 
 		$debug  = $lang->setDebug(false);
-		$keyref = Text::_($ref);
+		$keyref = \JText::_($ref);
 		$lang->setDebug($debug);
 
 		// Replace substitution codes in help URL.
@@ -184,7 +178,7 @@ class Help
 		if (!$xml)
 		{
 			$option['text']  = 'English (GB) help.joomla.org';
-			$option['value'] = 'https://help.joomla.org';
+			$option['value'] = 'http://help.joomla.org';
 
 			$list[] = (object) $option;
 		}

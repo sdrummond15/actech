@@ -8,11 +8,9 @@
 
 namespace Joomla\CMS\Application;
 
-\defined('JPATH_PLATFORM') or die;
+defined('JPATH_PLATFORM') or die;
 
 use Joomla\CMS\Component\ComponentHelper;
-use Joomla\CMS\Factory;
-use Joomla\CMS\Filter\OutputFilter;
 
 /**
  * Application helper functions
@@ -47,8 +45,8 @@ class ApplicationHelper
 			return $option;
 		}
 
-		$input = Factory::getApplication()->input;
-		$option = strtolower($input->get('option', ''));
+		$input = \JFactory::getApplication()->input;
+		$option = strtolower($input->get('option'));
 
 		if (empty($option))
 		{
@@ -71,7 +69,7 @@ class ApplicationHelper
 	 */
 	public static function getHash($seed)
 	{
-		return md5(Factory::getApplication()->get('secret') . $seed);
+		return md5(\JFactory::getConfig()->get('secret') . $seed);
 	}
 
 	/**
@@ -88,9 +86,9 @@ class ApplicationHelper
 	 */
 	public static function stringURLSafe($string, $language = '')
 	{
-		if (Factory::getApplication()->get('unicodeslugs') == 1)
+		if (\JFactory::getConfig()->get('unicodeslugs') == 1)
 		{
-			$output = OutputFilter::stringUrlUnicodeSlug($string);
+			$output = \JFilterOutput::stringURLUnicodeSlug($string);
 		}
 		else
 		{
@@ -100,7 +98,7 @@ class ApplicationHelper
 				$language = $languageParams->get('site');
 			}
 
-			$output = OutputFilter::stringURLSafe($string, $language);
+			$output = \JFilterOutput::stringURLSafe($string, $language);
 		}
 
 		return $output;
@@ -113,10 +111,10 @@ class ApplicationHelper
 	 * This method will return a client information array if called
 	 * with no arguments which can be used to add custom application information.
 	 *
-	 * @param   integer|string|null   $id      A client identifier
-	 * @param   boolean               $byName  If true, find the client by its name
+	 * @param   integer  $id      A client identifier
+	 * @param   boolean  $byName  If True, find the client by its name
 	 *
-	 * @return  \stdClass|array|void  Object describing the client, array containing all the clients or void if $id not known
+	 * @return  mixed  Object describing the client or false if not known
 	 *
 	 * @since   1.5
 	 */
@@ -144,18 +142,6 @@ class ApplicationHelper
 			$obj->name = 'installation';
 			$obj->path = JPATH_INSTALLATION;
 			self::$_clients[2] = clone $obj;
-
-			// API Client
-			$obj->id = 3;
-			$obj->name = 'api';
-			$obj->path = JPATH_API;
-			self::$_clients[3] = clone $obj;
-
-			// CLI Client
-			$obj->id = 4;
-			$obj->name = 'cli';
-			$obj->path = JPATH_CLI;
-			self::$_clients[4] = clone $obj;
 		}
 
 		// If no client id has been passed return the whole array
@@ -182,6 +168,8 @@ class ApplicationHelper
 				}
 			}
 		}
+
+		return;
 	}
 
 	/**
@@ -195,12 +183,12 @@ class ApplicationHelper
 	 */
 	public static function addClientInfo($client)
 	{
-		if (\is_array($client))
+		if (is_array($client))
 		{
 			$client = (object) $client;
 		}
 
-		if (!\is_object($client))
+		if (!is_object($client))
 		{
 			return false;
 		}
@@ -209,11 +197,90 @@ class ApplicationHelper
 
 		if (!isset($client->id))
 		{
-			$client->id = \count($info);
+			$client->id = count($info);
 		}
 
 		self::$_clients[$client->id] = clone $client;
 
 		return true;
+	}
+
+	/**
+	 * Parse a XML install manifest file.
+	 *
+	 * XML Root tag should be 'install' except for languages which use meta file.
+	 *
+	 * @param   string  $path  Full path to XML file.
+	 *
+	 * @return  array  XML metadata.
+	 *
+	 * @since       1.5
+	 * @deprecated  4.0 Use \JInstaller::parseXMLInstallFile instead.
+	 */
+	public static function parseXMLInstallFile($path)
+	{
+		\JLog::add('ApplicationHelper::parseXMLInstallFile is deprecated. Use \JInstaller::parseXMLInstallFile instead.', \JLog::WARNING, 'deprecated');
+
+		return \JInstaller::parseXMLInstallFile($path);
+	}
+
+	/**
+	 * Parse a XML language meta file.
+	 *
+	 * XML Root tag  for languages which is meta file.
+	 *
+	 * @param   string  $path  Full path to XML file.
+	 *
+	 * @return  array  XML metadata.
+	 *
+	 * @since       1.5
+	 * @deprecated  4.0 Use \JInstaller::parseXMLInstallFile instead.
+	 */
+	public static function parseXMLLangMetaFile($path)
+	{
+		\JLog::add('ApplicationHelper::parseXMLLangMetaFile is deprecated. Use \JInstaller::parseXMLInstallFile instead.', \JLog::WARNING, 'deprecated');
+
+		// Check if meta file exists.
+		if (!file_exists($path))
+		{
+			return false;
+		}
+
+		// Read the file to see if it's a valid component XML file
+		$xml = simplexml_load_file($path);
+
+		if (!$xml)
+		{
+			return false;
+		}
+
+		/*
+		 * Check for a valid XML root tag.
+		 *
+		 * Should be 'metafile'.
+		 */
+		if ($xml->getName() !== 'metafile')
+		{
+			unset($xml);
+
+			return false;
+		}
+
+		$data = array();
+
+		$data['name'] = (string) $xml->name;
+		$data['type'] = $xml->attributes()->type;
+
+		$data['creationDate'] = ((string) $xml->creationDate) ?: \JText::_('JLIB_UNKNOWN');
+		$data['author'] = ((string) $xml->author) ?: \JText::_('JLIB_UNKNOWN');
+
+		$data['copyright'] = (string) $xml->copyright;
+		$data['authorEmail'] = (string) $xml->authorEmail;
+		$data['authorUrl'] = (string) $xml->authorUrl;
+		$data['version'] = (string) $xml->version;
+		$data['description'] = (string) $xml->description;
+		$data['group'] = (string) $xml->group;
+
+		return $data;
 	}
 }
