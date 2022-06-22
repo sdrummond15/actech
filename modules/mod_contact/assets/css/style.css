@@ -1,0 +1,71 @@
+ul.contacts {
+    list-style: none;
+    display: table;
+    margin: 20px 0 0 0;
+    padding: 0;
+}
+
+ul.contacts.contact-right {
+    display: inline-flex;
+    float: right;
+    text-align: right;
+}
+
+ul.contacts li.small {
+    display: none;
+}
+
+ul.contacts li {
+    display: inline-block;
+    padding: 0;
+    margin-right: 60px;
+    vertical-align: middle;
+}
+
+ul.contacts li a {
+    font-weight: normal;
+    text-decoration: none;
+    font-size: 18px;
+    line-height: 1;
+    color: #0d3041;
+    display: inline-table;
+    vertical-align: middle;
+    margin: 0 5px;
+}
+
+ul.contacts li a.phone span {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+ul.contacts li a b {
+    font-weight: normal;
+}
+
+ul.contacts li a i {
+    font-size: 28px;
+}
+
+ul.contacts li a.phone-icon i {
+    font-size: 14px;
+}
+
+#contacts .certificado {
+    float: left;
+    margin-right: 40px;
+}
+
+@media screen and (max-width: 768px) {
+    ul.contacts li a b {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    ul.contacts li a span {
+        margin: 0;
+    }
+    ul.contacts li a i {
+        font-size: 24px;
+    }
+}
