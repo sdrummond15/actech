@@ -219,7 +219,6 @@ if ($LeftMenuOn and $RightMenuOn) {
             </div>
         </div>
     </div>
-    </div>
 </body>
 
 </html>

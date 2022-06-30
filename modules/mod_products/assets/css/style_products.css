@@ -1,0 +1,130 @@
+#modproducts {
+    width: 100%;
+    display: table;
+    position: relative;
+    margin-top: -80px;
+}
+
+#products {
+    width: 1290px;
+    margin: 0 auto;
+    padding: 0 0 80px 0;
+    display: table;
+}
+
+#products .products {
+    display: table;
+    float: left;
+    width: calc(33.33% - 20px);
+    margin: 0 0 0 30px;
+}
+
+#products .products:first-child {
+    margin: 0;
+}
+
+#products .products .item-products {
+    width: 100%;
+    margin: auto;
+    text-align: center;
+    display: table;
+    transition: 300ms all;
+    background-color: #0e3042;
+}
+
+#products .products .item-products a {
+    display: table;
+    margin: auto;
+    text-decoration: none;
+    background-position: center;
+    background-size: cover;
+}
+
+#products .products .item-products a:hover {
+    text-decoration: none;
+}
+
+#products .products .item-products h1 {
+    display: table;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+}
+
+#products .products .item-products h1 a {
+    display: table-cell;
+    vertical-align: middle;
+    color: #FFF;
+    font-size: 24px;
+    text-transform: uppercase;
+}
+
+#products .products .item-products a.img-products {
+    width: 100%;
+    background-size: cover !important;
+    background-position: center !important;
+}
+
+#products .products .item-products .desc {
+    padding: 10px 15px;
+}
+
+#products .products .item-products p {
+    color: #FFF;
+    font-size: 18px;
+    line-height: 1.3;
+    display: table;
+}
+
+@media screen and (max-width: 1200px) {
+    #products {
+        width: 100%;
+    }
+
+    #products .products {
+        width: calc(25% - 10px);
+        margin: 0 5px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    #products .products {
+        width: calc(33.33% - 20px);
+        margin: 0 10px 30px 10px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    #modproducts {
+        margin-bottom: 10px;
+    }
+
+    #products {
+        background-image: none;
+        padding: 40px 0;
+    }
+
+    #products .products {
+        width: calc(50% - 10px);
+        margin: 0 5px 20px 5px;
+    }
+
+    #products .products .item-products a {
+        padding: 0;
+    }
+
+    #products .products .item-products a.img-products img {
+        transform: scale(0.8);
+    }
+
+    #products .products .item-products h1 a {
+        font-size: 22px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    #products .products {
+        margin: 0 0 20px 0;
+        width: 100%;
+    }
+}

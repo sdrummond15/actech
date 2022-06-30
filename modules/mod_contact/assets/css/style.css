@@ -50,9 +50,29 @@ ul.contacts li a.phone-icon i {
     font-size: 14px;
 }
 
-#contacts .certificado {
-    float: left;
-    margin-right: 40px;
+.moduletable-contato-footer ul.contacts li {
+    display: table;
+    margin: 0 auto 30px auto;
+}
+
+.moduletable-contato-footer ul.contacts li a {
+    display: table;
+    margin: 0 auto 10px auto;
+    color: #FFF;
+    font-weight: 500;
+    font-size: 20px;
+}
+
+.moduletable-contato-footer ul.contacts li span {
+    display: none;
+}
+
+.moduletable-contato-footer ul.contacts li a.phone-icon {
+    display: none;
+}
+
+.moduletable-contato-footer ul.contacts li a.email-icon {
+    display: none;
 }
 
 @media screen and (max-width: 768px) {

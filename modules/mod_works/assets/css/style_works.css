@@ -1,0 +1,28 @@
+#work {
+    width: 100%;
+    display: table;
+    margin-top: 30px;
+}
+
+#work .work {
+    margin: auto;
+    display: table;
+}
+
+#work .work .button_work a span.text_button{
+    color: #FFF;
+    font-weight: 600;
+    font-size: 20px;
+    text-transform: uppercase;
+    float: left;
+    margin-top: 20px;
+}
+
+#work .work .button_work span {
+    font-size: 30px;
+}
+
+#work .work .button_work img {
+    float: left;
+    margin-right: 15px;
+}

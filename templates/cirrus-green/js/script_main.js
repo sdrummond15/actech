@@ -51,4 +51,12 @@ jQuery(document).ready(function ($) {
       "#504f51"
     );
   }
+
+  if(home){
+    var introImage = $('.item-page-home .intro-image').width();
+    var imgFulltext = $('.img-fulltext-right').outerWidth(true)
+    $('.item-page-home .intro-image').width(introImage - imgFulltext);
+
+    $('.img-fulltext-right').css('margin-top',  $('.item-page-home .intro-image').height() * (-1));
+  }
 });

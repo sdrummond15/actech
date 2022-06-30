@@ -1,0 +1,120 @@
+.vacancies-form h1 {
+    line-height: 1.2;
+    color: #444;
+    font-size: 30px;
+    margin: 0 0 30px 0;
+    text-align: center;
+}
+
+#vacancy-form fieldset {
+    width: calc(50% - 15px);
+    float: left;
+    margin-right: 20px;
+    margin-left: 5px;
+}
+
+#vacancy-form fieldset:last-child {
+    margin-left: 0px;
+    margin-right: 5px;
+}
+
+#vacancy-form input[type="text"],
+#vacancy-form input[type="email"] {
+    width: 96%;
+    padding: 8px 2%;
+    margin-bottom: 8px;
+    border: 0;
+    background-color: #f1f1f1;
+    color: #444;
+    font-size: 16px;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#vacancy-form textarea {
+    font-family: 'Catamaran', 'Droid Sans', sans-serif, Helvetica, Arial;
+    width: 96%;
+    padding: 8px 2%;
+    margin-bottom: 8px;
+    border: 0;
+    background-color: #f1f1f1;
+    color: #444;
+    font-size: 16px;
+    border-radius: 0;
+    min-height: 94px;
+    box-shadow: none;
+}
+
+#vacancy-form .submitform {
+    float: right;
+}
+
+.custom-file-input {
+    width: 100% !important;
+    padding: 0 !important;
+    background: transparent !important;
+    text-align: right !important;
+    opacity: 1 !important;
+}
+
+.enviado h1 {
+    line-height: 1.2;
+    color: #444;
+    font-size: 24px;
+    margin: 0 0 30px 0;
+    text-align: center;
+}
+
+.enviado p {
+    line-height: 1.2;
+    color: #444;
+    font-size: 20px;
+    margin: 0 0 30px 0;
+    text-align: center;
+}
+
+.erro {
+    width: 100%;
+    display: table;
+}
+
+.erro h3 {
+    line-height: 1.2;
+    color: #444;
+    font-size: 24px;
+    margin: 0 0 30px 0;
+    text-align: center;
+}
+
+.voltar {
+    width: auto !important;
+    padding: 10px 20px !important;
+    color: #666 !important;
+    cursor: pointer !important;
+    border: 0 !important;
+    font-size: 18px !important;
+    text-transform: uppercase !important;
+    margin: auto;
+    display: table;
+    background: rgba(204, 204, 204, 1);
+    background: -moz-linear-gradient(top, rgba(204, 204, 204, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(204, 204, 204, 1) 100%);
+    background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(204, 204, 204, 1)), color-stop(50%, rgba(255, 255, 255, 1)), color-stop(100%, rgba(204, 204, 204, 1)));
+    background: -webkit-linear-gradient(top, rgba(204, 204, 204, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(204, 204, 204, 1) 100%);
+    background: -o-linear-gradient(top, rgba(204, 204, 204, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(204, 204, 204, 1) 100%);
+    background: -ms-linear-gradient(top, rgba(204, 204, 204, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(204, 204, 204, 1) 100%);
+    background: linear-gradient(to bottom, rgba(204, 204, 204, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(204, 204, 204, 1) 100%);
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#cccccc', endColorstr='#cccccc', GradientType=0);
+}
+
+.voltar:hover {
+    color: #444;
+    text-decoration: none;
+    background: rgba(136, 136, 136, 1);
+    background: -moz-linear-gradient(top, rgba(136, 136, 136, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(136, 136, 136, 1) 100%);
+    background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(136, 136, 136, 1)), color-stop(50%, rgba(255, 255, 255, 1)), color-stop(100%, rgba(136, 136, 136, 1)));
+    background: -webkit-linear-gradient(top, rgba(136, 136, 136, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(136, 136, 136, 1) 100%);
+    background: -o-linear-gradient(top, rgba(136, 136, 136, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(136, 136, 136, 1) 100%);
+    background: -ms-linear-gradient(top, rgba(136, 136, 136, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(136, 136, 136, 1) 100%);
+    background: linear-gradient(to bottom, rgba(136, 136, 136, 1) 0%, rgba(255, 255, 255, 1) 50%, rgba(136, 136, 136, 1) 100%);
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#888888', endColorstr='#888888', GradientType=0);
+}

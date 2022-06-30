@@ -11,6 +11,9 @@
 defined('_JEXEC') or die;
 
 $app = JFactory::getApplication();
+$menu = $app->getMenu();
+$lang = JFactory::getLanguage();
+$home = boolval($menu->getActive() == $menu->getDefault($lang->getTag()));
 $templateparams = $app->getTemplate(true)->params;
 $images = json_decode($this->item->images);
 $urls = json_decode($this->item->urls);

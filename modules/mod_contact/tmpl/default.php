@@ -34,7 +34,7 @@
         //E-mail
         if (!empty($email)) : ?>
             <li>
-                <a href="mailto:<?php echo $email; ?>" target="_blank" class="email">
+                <a href="mailto:<?php echo $email; ?>" target="_blank" class="email-icon">
                     <img src="images/email-icon.png" alt="e-mail actech">
                 </a>
                 <a href="mailto:<?php echo $email; ?>" target="_blank" class="email">
