@@ -317,10 +317,9 @@ p {
 
 h1 {
     font-family: 'Montserrat', 'Droid Sans', sans-serif, Helvetica, Arial;
-    font-weight: 400;
+    font-weight: 500;
     color: #90c140;
     font-size: 26px;
-    line-height: 1.15em;
     margin-bottom: 12px;
 }
 
@@ -336,10 +335,9 @@ h1 a:hover {
 
 h2 {
     font-family: 'Montserrat', 'Droid Sans', sans-serif, Helvetica, Arial;
-    font-weight: 400;
+    font-weight: 500;
     color: #000;
     font-size: 24px;
-    line-height: 1.15em;
     margin-bottom: 10px;
 }
 
@@ -355,10 +353,9 @@ h2 a:hover {
 
 h3 {
     font-family: 'Montserrat', 'Droid Sans', sans-serif, Helvetica, Arial;
-    font-weight: 400;
+    font-weight: 500;
     color: #000;
     font-size: 20px;
-    line-height: 1.15em;
     margin-bottom: 6px;
 }
 
@@ -373,9 +370,9 @@ h3 a:hover {
 }
 
 h4 {
-    font-weight: 600;
+    font-weight: 500;
     color: #000;
-    font-size: 14px;
+    font-size: 18px;
 }
 
 h5 {
@@ -391,7 +388,7 @@ h6 {
 
 ol, ul {
     list-style-position: outside;
-    list-style-type: square;
+    list-style-type: circle;
     padding-left: 30px;
     margin-top: 6px;
     margin-bottom: 6px;
@@ -1014,6 +1011,11 @@ table {
 td, tr {
     border: solid 1px #ddd;
     vertical-align: top;
+    padding: 2px 5px;
+}
+
+tr th {
+    padding: 2px 5px;
 }
 
 table.category, table.weblinks {
@@ -1044,6 +1046,32 @@ td.hits {
 td p {
     margin: 0;
     line-height: 1.3em;
+}
+
+table.produto-detalhe th {
+    background-color: #333;
+    color: #FFF;
+    font-weight: 600;
+}
+
+table.produto-detalhe th,
+table.produto-detalhe td {
+    text-align: center;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+table.produto-detalhe tr:nth-child(2) {
+    background-color: #ececec;
+}
+
+table.produto-detalhe td.rotate {
+    -ms-writing-mode: tb-rl;
+    -webkit-writing-mode: vertical-rl;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    padding: 5px;
+    font-weight: 500;
 }
 
 .display-limit, .filter {
@@ -1917,11 +1945,18 @@ body.contentpane a:hover {
 .img-fulltext-right, .img-intro-right {
     float: right;
     margin: 0 0 10px 30px;
+    max-width: 30%;
 }
 
 .img-fulltext-left, .img-intro-left {
     float: left;
     margin: 0 30px 10px 0;
+    max-width: 30%;
+}
+
+.img-fulltext-right img, .img-intro-right img,
+.img-fulltext-left img, .img-intro-left img {
+    width: 100%;
 }
 
 .blog-featured-home img {
